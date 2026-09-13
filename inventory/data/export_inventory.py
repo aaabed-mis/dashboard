@@ -235,37 +235,42 @@ for r in con.execute(sql).fetchall():
     }
 print("  materials with sales:", len(sales_mat))
 
-# Average Sales = mean of the top-3 months within the last 6 months of data.
+# Average Sales = mean of the top-3 months within the last 6 months of data,
+# EXCLUDING the current (latest) month — a partial month would skew the average.
 # Also emit the last 3 months' sales (m0 = current month, m1, m2) as separate
 # columns, and the month labels for the header. Material-level, company-wide
 # (like umrez/maabc) — not office-scoped.
 try:
-    six_months = sorted({r[0] for r in con.execute(
-        "SELECT DISTINCT zmonth FROM sap_prd.fact_ztsd_detail").fetchall()})[-6:]
+    all_months = sorted({r[0] for r in con.execute(
+        "SELECT DISTINCT zmonth FROM sap_prd.fact_ztsd_detail").fetchall()})
+    # avg window: 6 months BEFORE the current month (current excluded)
+    avg_months = all_months[:-1][-6:] if len(all_months) > 1 else all_months
+    # M0/M1/M2 columns: current month + 2 prior (current INCLUDED)
+    last3_months = all_months[-3:] if len(all_months) >= 3 else all_months
+    months = sorted(set(avg_months) | set(last3_months))
     monthly = {}   # matnr -> {zmonth: qty_in_sku}
-    if six_months:
-        marks = ",".join("?" * len(six_months))
+    if months:
+        marks = ",".join("?" * len(months))
         for m, z, mq in con.execute(
             "SELECT material, zmonth, ROUND(SUM(qty_in_sku),4) FROM sap_prd.fact_ztsd_detail "
-            f"WHERE zmonth IN ({marks}) GROUP BY 1,2", six_months).fetchall():
+            f"WHERE zmonth IN ({marks}) GROUP BY 1,2", months).fetchall():
             mm = strip_matnr(m)
             monthly.setdefault(mm, {})[z] = float(mq or 0)
     avg_top3 = {}
     for m, byz in monthly.items():
-        vals = [byz.get(z, 0.0) for z in six_months]
+        vals = [byz.get(z, 0.0) for z in avg_months]
         top3 = sorted(vals, reverse=True)[:3]
         avg_top3[m] = round(sum(top3) / len(top3), 4)
-        last3 = six_months[-3:]                        # oldest..newest, e.g. 202606..202608
-        for i, z in enumerate(last3):                  # m0 = newest (current month)
-            sales_mat[m][f"m{2-i}"] = round(byz.get(z, 0.0), 4)
+        for i, z in enumerate(reversed(last3_months)):  # m0 = newest (current month)
+            sales_mat[m][f"m{i}"] = round(byz.get(z, 0.0), 4)
     for m in sales_mat:
         sales_mat[m]["avg_top3"] = avg_top3.get(m, 0.0)
         sales_mat[m].setdefault("m0", 0.0)
         sales_mat[m].setdefault("m1", 0.0)
         sales_mat[m].setdefault("m2", 0.0)
-    month_labels = list(reversed(six_months[-3:])) if six_months else []
-    print("  avg_top3 (top-3 of last 6 months) computed for", len(avg_top3),
-          "materials | month labels:", month_labels)
+    month_labels = list(reversed(last3_months)) if last3_months else []
+    print("  avg_top3 (top-3 of last 6 months, current month excluded) computed for",
+          len(avg_top3), "materials | avg window:", avg_months, "| month labels:", month_labels)
 except Exception as e:
     print("  WARN avg_top3:", e)
     for m in sales_mat:
