@@ -2,7 +2,7 @@ import duckdb, json, datetime, os
 from collections import Counter
 SRC = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\duckdb\material_aging.duckdb"
 SALES = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\duckdb\avg_sales_6mo.duckdb"
-OUT = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\Dashboards\MaterialAgingDashboard\data\material_aging.json"
+OUT = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\Dashboards\dashboard\aging\data\material_aging.json"
 T = "sap_prd.material_aging"
 
 # NOTE: the source schema of material_aging.duckdb has changed repeatedly between
@@ -202,7 +202,7 @@ meta = {
 with open(OUT, "w", encoding="utf-8") as f:
     json.dump({"meta": meta, "records": data, "gdrn": gdrn}, f, ensure_ascii=False)
 
-OUT_JS = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\Dashboards\MaterialAgingDashboard\data\data.js"
+OUT_JS = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\Dashboards\dashboard\aging\data\data.js"
 with open(OUT_JS, "w", encoding="utf-8") as f:
     f.write("window.__AGING__ = ")
     json.dump({"meta": meta, "records": data, "gdrn": gdrn}, f, ensure_ascii=False)
