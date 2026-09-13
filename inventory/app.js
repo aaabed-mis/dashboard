@@ -22,7 +22,7 @@ const PALETTE = ['#4f8cff','#22c1a4','#f5a623','#ff5d6c','#a78bfa','#33c08a','#f
 
 let DATA = null;   // window.__INVENTORY__
 const state = {
-  vkorg:'', werks:new Set(), extwg:'', matkl:'', maabc:'', window:90, status:'', risk:'', replen:'', search:'',
+  vkorg:'', werks:new Set(), extwg:'', matkl:'', maabc:'', status:'', risk:'', replen:'', search:'',
   sortKey:'value', sortDir:-1, page:1, pageSize:50,
   colWidths:{},   // per-column px widths (Material Analysis resize)
   hiddenCols:new Set(['vendor','wgbez','ewbez','maabc','umrez','plantCount','lastSale']),   // hidden-by-default columns
@@ -98,8 +98,8 @@ function computeSkus(){
     if(state.maabc && (mat.maabc||'')!==state.maabc) continue;
     if(q && !(m+' '+(mat.maktx||'')).toLowerCase().includes(q)) continue;
     let o=inv.get(m);
-    if(!o){ o={qty:0,value:0,huom:0,plants:new Set()}; inv.set(m,o); }
-    o.qty+=r[3]; o.value+=r[4]; o.huom+=(r[6]||0); o.plants.add(w);
+    if(!o){ o={qty:0,value:0,huom:0,ton:0,plants:new Set()}; inv.set(m,o); }
+    o.qty+=r[3]; o.value+=r[4]; o.huom+=(r[6]||0); o.ton+=(r[7]||0); o.plants.add(w);
   }
   // 2) demand: office-scoped when plant/vkorg filter active, else company-wide
   const demand = new Map(); // matnr -> {qW,vW,q365,v365,lastSale}
@@ -120,9 +120,10 @@ function computeSkus(){
       if(r[8] && (!o.lastSale || r[8]>o.lastSale)) o.lastSale=r[8];
     }
     for(const [m,o] of byOffice){
-      demand.set(m,{qW:state.window===30?o.q30:state.window===60?o.q90:state.window===90?o.q90:o.q365,
-                    vW:state.window===30?o.v30:state.window===60?o.v90:state.window===90?o.v90:o.v365,
-                    q365:o.q365, v365:o.v365, lastSale:o.lastSale});
+      const sm=DATA.sales_mat[m]||{};
+      demand.set(m,{qW:o.q90, vW:o.v90,
+                    q365:o.q365, v365:o.v365, lastSale:o.lastSale, avgTop3:sm.avg_top3||0,
+                    m0:sm.m0||0, m1:sm.m1||0, m2:sm.m2||0});
     }
   } else {
     for(const [m,s] of Object.entries(DATA.sales_mat)){
@@ -131,9 +132,9 @@ function computeSkus(){
       if(state.matkl && (mat.matkl||'')!==state.matkl) continue;
       if(state.maabc && (mat.maabc||'')!==state.maabc) continue;
       if(q && !(m+' '+(mat.maktx||'')).toLowerCase().includes(q)) continue;
-      demand.set(m,{qW:state.window===30?s.q30:state.window===60?s.q60:state.window===90?s.q90:s.q365,
-                    vW:state.window===30?s.v30:state.window===60?s.v60:state.window===90?s.v90:s.v365,
-                    q365:s.q365, v365:s.v365, lastSale:s.last_sale});
+      demand.set(m,{qW:s.q90, vW:s.v90,
+                    q365:s.q365, v365:s.v365, lastSale:s.last_sale, avgTop3:s.avg_top3||0,
+                    m0:s.m0||0, m1:s.m1||0, m2:s.m2||0});
     }
   }
   // 3) incoming: ALL open PO lines per matnr (regardless of status — incl. overdue), per user 2026-09-06
@@ -178,7 +179,6 @@ function computeSkus(){
     }
   }
   const skus=[];
-  const dailyW = state.window; // days in window
   for(const m of keys){
     const iv=inv.get(m), dm=demand.get(m), ic=inc.get(m), fm=fc.get(m);
     const mat=DATA.mats[m]||{};
@@ -187,8 +187,10 @@ function computeSkus(){
     const qty=iv?iv.qty:0, value=iv?iv.value:0, huom=iv?iv.huom:0;
     const umrez=(mat.umrez||1)||1;
     const fcQty=fm?(fm.qty*umrez):0;    // Forecast zbqty in cartons -> pieces (× umrez)
-    const qW = dm?dm.qW:0;                          // Sales Qty in PIECES (payload in base units)
-    const dailyDemand = qW/dailyW;                  // daily demand in PIECES (matches qty in pieces)
+    const qW = dm?dm.qW:0;                          // Sales Qty in PIECES (90d window; internal status/risk only — column removed)
+    const avgSales = dm?dm.avgTop3:0;               // Average Sales = top-3 of last 6 months (monthly, pieces)
+    const dailyDemand = avgSales>0 ? avgSales/30.44 : 0;   // monthly avg -> daily rate (30.44 d/mo)
+    const salesM0=dm?dm.m0:0, salesM1=dm?dm.m1:0, salesM2=dm?dm.m2:0;   // current + 2 prior months (pieces)
     const vW=dm?dm.vW:0, q365=dm?dm.q365:0, v365=dm?dm.v365:0;
     const incQty=ic?(ic.qty*umrez):0, incValue=ic?ic.value:0, overdueQty=ic?ic.overdueQty:0;   // Incoming Qty in cartons -> pieces (× umrez)
     // ---- lead time / safety stock aware (from dim_material_master) ----
@@ -246,8 +248,9 @@ function computeSkus(){
     if(state.replen && replen!==state.replen) continue;
     skus.push({matnr:m, maktx:mat.maktx||'', extwg:mat.extwg||'', ewbez:mat.ewbez||'',
       matkl:mat.matkl||'', wgbez:mat.wgbez||'', mfrnr:mat.mfrnr||'', name11:mat.name11||'',
-      qty, value, huom, maabc:mat.maabc||'', vendor:mat.name11||mat.name1||'', matkl:mat.matkl||'', ewbez:mat.ewbez||'', plantCount:iv?iv.plants.size:0, plantsArr:iv?[...iv.plants]:[],
-      qW, vW, q365, v365, dailyDemand, coverage, coverageMo, fcQty,
+      qty, value, huom, ton:iv?iv.ton:0, maabc:mat.maabc||'', vendor:mat.name11||mat.name1||'', matkl:mat.matkl||'', ewbez:mat.ewbez||'', plantCount:iv?iv.plants.size:0, plantsArr:iv?[...iv.plants]:[],
+      qW, vW, q365, v365, dailyDemand, coverage, coverageMo, fcQty, avgSales,
+      salesM0, salesM1, salesM2,
       leadTime, safetyStock, target, excessQty, excessValue, reorder, umrez,
       expiredVal:agm.expiredVal, expiredBatches:agm.expiredBatches,
       nearVal:agm.nearVal, nearQty:agm.nearQty, nearBatches:agm.nearBatches,
@@ -292,8 +295,8 @@ function aggregate(skus){
     st.value+=s.value; st.count++;
     a.byRisk[s.risk].count++;
     const eg=s.ewbez||s.extwg||'(none)';
-    const g=a.byExtwg[eg]||(a.byExtwg[eg]={value:0,qty:0,count:0});
-    g.value+=s.value; g.qty+=s.qty; g.count++;
+    const g=a.byExtwg[eg]||(a.byExtwg[eg]={value:0,qty:0,ton:0,count:0});
+    g.value+=s.value; g.qty+=s.qty; g.ton+=(s.ton||0); g.count++;
     const mk=s.maktx?s.matnr+' – '+s.maktx:s.matnr;
     a.byMatnr[mk]=(a.byMatnr[mk]||0)+s.value;
   }
@@ -374,7 +377,8 @@ function renderExtwg(a){
       backgroundColor:entries.map((_,i)=>`hsl(${210-i*13} 70% 58%)`),borderRadius:6}]},
     options:{indexAxis:'y',maintainAspectRatio:false,
       plugins:{legend:{display:false},
-        tooltip:{callbacks:{title:items=>items[0].label,label:c=>fmtMoneyM(c.raw)}}},
+        tooltip:{callbacks:{title:items=>items[0].label,
+          label:c=>{const e=entries[c.dataIndex][1]; return fmtMoneyM(e.value)+' · '+fmtNum(e.ton,0)+' t';}}}},
       scales:{x:{ticks:{callback:v=>fmtMoneyM(v)}}}}});}
 function renderRisk(a){
   const labels=RISK_ORDER.filter(s=>a.byRisk[s].count>0);
@@ -412,8 +416,10 @@ const SKU_COLS=[
   {k:'plantCount',t:'Plant',cls:'num'},
   {k:'qty',t:'Qty',cls:'num'},
   {k:'value',t:'Value',cls:'num'},
-  {k:'qW',t:'Sales Qty',cls:'num'},
-  {k:'dailyDemand',t:'Daily Sales',cls:'num'},
+  {k:'avgSales',t:'Average Sales',cls:'num'},
+  {k:'salesM0',t:'Sales (M0)',cls:'num'},
+  {k:'salesM1',t:'Sales (M1)',cls:'num'},
+  {k:'salesM2',t:'Sales (M2)',cls:'num'},
   {k:'coverageMo',t:'Coverage (mo)',cls:'num'},
   {k:'leadTime',t:'Lead Time',cls:'num'},
   {k:'safetyStock',t:'Safety Stock',cls:'num'},
@@ -427,8 +433,8 @@ const SKU_COLS=[
   {k:'reorder',t:'Reorder',cls:''},
   {k:'lastSale',t:'Last Sale',cls:''},
 ];
-const SKU_HEAD=['SKU','Description','Vendor','Mat Group','Ext Mat Group','ABC','Factor','Plant','Qty','Value','Sales Qty','Daily Sales','Coverage (mo)','Lead Time','Safety Stock','Ideal Stock','Sales Forecast','Excess Qty','Excess Value','Incoming Qty','Stock Status','Risk','Reorder','Last Sale'];
-const SKU_CSV_KEYS=['matnr','maktx','vendor','wgbez','ewbez','maabc','umrez','plantCount','qty','value','qW','dailyDemand','coverageMo','leadTime','safetyStock','target','fcQty','excessQty','excessValue','incQty','status','risk','reorder','lastSale'];
+const SKU_HEAD=['SKU','Description','Vendor','Mat Group','Ext Mat Group','ABC','Factor','Plant','Qty','Value','Average Sales','Sales (M0)','Sales (M1)','Sales (M2)','Coverage (mo)','Lead Time','Safety Stock','Ideal Stock','Sales Forecast','Excess Qty','Excess Value','Incoming Qty','Stock Status','Risk','Reorder','Last Sale'];
+const SKU_CSV_KEYS=['matnr','maktx','vendor','wgbez','ewbez','maabc','umrez','plantCount','qty','value','avgSales','salesM0','salesM1','salesM2','coverageMo','leadTime','safetyStock','target','fcQty','excessQty','excessValue','incQty','status','risk','reorder','lastSale'];
 function drawSkuTable(skus){
   const cols=SkuVisibleCols();
   SKU_VISIBLE=cols;
@@ -462,6 +468,8 @@ function drawSkuTable(skus){
       if(c.k==='umrez') return `<td class="num">${fmtNum(v,1)}</td>`;
       if(c.k==='qty'||c.k==='huom'||c.k==='fcQty'||c.k==='qW'||c.k==='incQty') return `<td class="num">${fmtInt(v)}</td>`;
       if(c.k==='dailyDemand') return `<td class="num">${fmtNum(r.dailyDemand,1)}</td>`;
+      if(c.k==='avgSales') return `<td class="num">${r.avgSales>0?fmtInt(r.avgSales):'—'}</td>`;
+      if(c.k==='salesM0'||c.k==='salesM1'||c.k==='salesM2') return `<td class="num">${r[c.k]>0?fmtInt(r[c.k]):'—'}</td>`;
       if(c.k==='value'||c.k==='vW'||c.k==='incValue') return `<td class="num">${fmtMoney(v)}</td>`;
       return `<td class="num">${fmtInt(v)}</td>`;
     }).join('')+'</tr>').join('');
@@ -470,7 +478,7 @@ function drawSkuTable(skus){
   document.getElementById('next').disabled=state.page>=pages;
   setupSkuResize();
 }
-const SKU_DEF_WIDTHS={matnr:95,maktx:280,vendor:200,wgbez:110,ewbez:150,maabc:48,umrez:55,plantCount:58,qty:90,value:120,qW:95,dailyDemand:95,coverageMo:100,leadTime:68,safetyStock:90,target:95,fcQty:100,excessQty:88,excessValue:120,incQty:95,status:120,risk:95,reorder:88,lastSale:95};
+const SKU_DEF_WIDTHS={matnr:95,maktx:280,vendor:200,wgbez:110,ewbez:150,maabc:48,umrez:55,plantCount:58,qty:90,value:120,avgSales:95,salesM0:95,salesM1:95,salesM2:95,coverageMo:100,leadTime:68,safetyStock:90,target:95,fcQty:100,excessQty:88,excessValue:120,incQty:95,status:120,risk:95,reorder:88,lastSale:95};
 let SKU_VISIBLE=SKU_COLS;   // columns currently shown (updated each draw)
 function SkuVisibleCols(){ return SKU_COLS.filter(c=>!state.hiddenCols.has(c.k)); }
 function initColMan(){
@@ -739,16 +747,15 @@ function initUI(){
   document.getElementById('f-extwg').onchange=e=>{state.extwg=e.target.value; resetPages(); refresh();};
   document.getElementById('f-matkl').onchange=e=>{state.matkl=e.target.value; resetPages(); refresh();};
   document.getElementById('f-maabc').onchange=e=>{state.maabc=e.target.value; resetPages(); refresh();};
-  document.getElementById('f-window').onchange=e=>{state.window=parseInt(e.target.value,10); resetPages(); refresh();};
   document.getElementById('f-status').onchange=e=>{state.status=e.target.value; resetPages(); refresh();};
   document.getElementById('f-risk').onchange=e=>{state.risk=e.target.value; resetPages(); refresh();};
   document.getElementById('f-replen').onchange=e=>{state.replen=e.target.value; resetPages(); refresh();};
   document.getElementById('f-search').oninput=e=>{state.search=e.target.value; resetPages(); refresh();};
   document.getElementById('reset').onclick=()=>{
-    state.vkorg=''; state.werks.clear(); state.extwg=''; state.matkl=''; state.window=90;
+    state.vkorg=''; state.werks.clear(); state.extwg=''; state.matkl='';
     state.status=''; state.risk=''; state.replen=''; state.search='';
     document.getElementById('f-vkorg').value=''; document.getElementById('f-extwg').value='';
-    document.getElementById('f-matkl').value=''; document.getElementById('f-maabc').value=''; document.getElementById('f-window').value='90';
+    document.getElementById('f-matkl').value=''; document.getElementById('f-maabc').value='';
     document.getElementById('f-status').value=''; document.getElementById('f-risk').value='';
     document.getElementById('f-replen').value=''; document.getElementById('f-search').value='';
     document.querySelectorAll('.ms[data-key="werks"] input[type="checkbox"]').forEach(c=>c.checked=false);
@@ -829,6 +836,17 @@ function boot(){
     return;
   }
   AS_OF = (DATA.meta?.generated_at||'').slice(0,10) || '2026-09-03';
+  // Label the three monthly-sales columns with the actual months from the payload
+  // (e.g. 'Sales 202608' → 'Sales Aug-26'). M0 = current month.
+  const ml = DATA.meta?.month_labels || [];
+  const monthName = ym => { const m = String(ym).slice(4,6), y = String(ym).slice(2,4);
+    const names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return names[parseInt(m,10)-1]+'-'+y; };
+  SKU_COLS.forEach(c=>{
+    if(c.k==='salesM0' && ml[0]) c.t='Sales '+monthName(ml[0]);
+    if(c.k==='salesM1' && ml[1]) c.t='Sales '+monthName(ml[1]);
+    if(c.k==='salesM2' && ml[2]) c.t='Sales '+monthName(ml[2]);
+  });
   initTheme();
   initUI();
   initColMan();

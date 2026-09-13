@@ -109,15 +109,6 @@
       <select id="f-maabc" class="select"></select>
     </div>
     <div class="filter-group">
-      <label>Demand Window</label>
-      <select id="f-window" class="select">
-        <option value="30">Last 30 days</option>
-        <option value="60">Last 60 days</option>
-        <option value="90" selected>Last 90 days</option>
-        <option value="365">Last 12 months</option>
-      </select>
-    </div>
-    <div class="filter-group">
       <label>Stock Status</label>
       <select id="f-status" class="select"></select>
     </div>
@@ -171,9 +162,10 @@
         <ul>
           <li><b>Total Inventory Value</b> = Σ (on-hand quantity × unit price) across all plants, plus the value of in-transit STOs.</li>
           <li><b>Unit Price (ma_price)</b> = the material's moving-average / valuation price, using the latest available price for each material.</li>
-          <li><b>Daily Sales</b> = total sales quantity over the selected demand window ÷ number of days in the window. The default window is the last 90 days.</li>
-          <li><b>Coverage (months)</b> = current stock ÷ daily sales, converted to months using 30.44 days per month.</li>
-          <li><b>Ideal Stock</b> = safety stock + (daily sales × lead time).</li>
+          <li><b>Average Sales</b> = mean of the top-3 months within the last 6 months of sales data (pieces/month).</li>
+          <li><b>Sales M0/M1/M2</b> = sales quantity for the current month and the two previous months (pieces).</li>
+          <li><b>Coverage (months)</b> = current stock ÷ Average Sales, expressed in months.</li>
+          <li><b>Ideal Stock</b> = safety stock + (Average Sales ÷ 30.44 × lead time).</li>
           <li><b>Excess Quantity / Value</b> = the quantity or value of stock above the Ideal Stock, where the difference is positive.</li>
           <li><b>Incoming Quantity</b> = total open purchase-order quantity × Factor, converted to pieces. <b>Incoming PO Value</b> = Σ of PO net values.</li>
           <li><b>Sales Forecast</b> = planned forecast quantity × Factor, expressed in pieces.</li>
@@ -274,7 +266,7 @@
   <script src="auth-config.js?v=20260913b"></script>
   <script src="auth.js?v=20260912m"></script>
   <script src="assets/chart.umd.min.js"></script>
-  <script src="data/data.js?v=20260913"></script>
-  <script src="app.js?v=20260912p"></script>
+  <script src="data/data.js?v=20260913d"></script>
+  <script src="app.js?v=20260913a"></script>
 </body>
 </html>

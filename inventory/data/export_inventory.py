@@ -51,15 +51,16 @@ SELECT matnr, werks, vkorg,
        SUM(clabs) AS qty,
        ROUND(SUM(clabs * COALESCE(ma_price,0)), 2) AS value,
        COUNT(*) AS batches,
-       ROUND(SUM(COALESCE(huom,0)), 4) AS huom
+       ROUND(SUM(COALESCE(huom,0)), 4) AS huom,
+       ROUND(SUM(clabs * COALESCE(ntgew,0))/1000, 3) AS ton
 FROM sap_prd.fact_inventory
 GROUP BY 1,2,3
 """)
-inv_idx = {}   # (matnr,werks) -> [qty,value,batches,huom]
+inv_idx = {}   # (matnr,werks) -> [qty,value,batches,huom,ton]
 plants = {}    # werks -> name1
-for matnr, werks, vkorg, qty, value, batches, huom in rows:
+for matnr, werks, vkorg, qty, value, batches, huom, ton in rows:
     m = strip_matnr(matnr)
-    inv_idx[(m, werks)] = [round(float(qty), 4), round(float(value), 2), int(batches), round(float(huom), 4)]
+    inv_idx[(m, werks)] = [round(float(qty), 4), round(float(value), 2), int(batches), round(float(huom), 4), round(float(ton), 3)]
 
 # 1b) aging per batch: mirror MaterialAgingDashboard EXACTLY.
 #     Source of truth = material_aging.duckdb (same table the aging dashboard's export_aging.py reads),
@@ -234,6 +235,44 @@ for r in con.execute(sql).fetchall():
     }
 print("  materials with sales:", len(sales_mat))
 
+# Average Sales = mean of the top-3 months within the last 6 months of data.
+# Also emit the last 3 months' sales (m0 = current month, m1, m2) as separate
+# columns, and the month labels for the header. Material-level, company-wide
+# (like umrez/maabc) — not office-scoped.
+try:
+    six_months = sorted({r[0] for r in con.execute(
+        "SELECT DISTINCT zmonth FROM sap_prd.fact_ztsd_detail").fetchall()})[-6:]
+    monthly = {}   # matnr -> {zmonth: qty_in_sku}
+    if six_months:
+        marks = ",".join("?" * len(six_months))
+        for m, z, mq in con.execute(
+            "SELECT material, zmonth, ROUND(SUM(qty_in_sku),4) FROM sap_prd.fact_ztsd_detail "
+            f"WHERE zmonth IN ({marks}) GROUP BY 1,2", six_months).fetchall():
+            mm = strip_matnr(m)
+            monthly.setdefault(mm, {})[z] = float(mq or 0)
+    avg_top3 = {}
+    for m, byz in monthly.items():
+        vals = [byz.get(z, 0.0) for z in six_months]
+        top3 = sorted(vals, reverse=True)[:3]
+        avg_top3[m] = round(sum(top3) / len(top3), 4)
+        last3 = six_months[-3:]                        # oldest..newest, e.g. 202606..202608
+        for i, z in enumerate(last3):                  # m0 = newest (current month)
+            sales_mat[m][f"m{2-i}"] = round(byz.get(z, 0.0), 4)
+    for m in sales_mat:
+        sales_mat[m]["avg_top3"] = avg_top3.get(m, 0.0)
+        sales_mat[m].setdefault("m0", 0.0)
+        sales_mat[m].setdefault("m1", 0.0)
+        sales_mat[m].setdefault("m2", 0.0)
+    month_labels = list(reversed(six_months[-3:])) if six_months else []
+    print("  avg_top3 (top-3 of last 6 months) computed for", len(avg_top3),
+          "materials | month labels:", month_labels)
+except Exception as e:
+    print("  WARN avg_top3:", e)
+    for m in sales_mat:
+        sales_mat[m]["avg_top3"] = 0.0
+        sales_mat[m]["m0"] = sales_mat[m]["m1"] = sales_mat[m]["m2"] = 0.0
+    month_labels = []
+
 # per sales-office windows (warehouse demand)
 sel = ["sales_office", "MIN(region_desc) region_desc"]
 for d in WINDOWS:
@@ -382,8 +421,8 @@ for o, info in sales_office.items():
 
 # build compact inventory array: [matnr, werks, vkorg, qty, value, batches, huom]
 inventory = []
-for (m, w), (qty, value, batches, huom) in inv_idx.items():
-    inventory.append([m, w, plants.get(w, {}).get("vkorg", ""), qty, value, batches, huom])
+for (m, w), (qty, value, batches, huom, ton) in inv_idx.items():
+    inventory.append([m, w, plants.get(w, {}).get("vkorg", ""), qty, value, batches, huom, ton])
 inventory.sort(key=lambda r: -r[4])
 
 meta = {
@@ -396,6 +435,7 @@ meta = {
     "sales_materials": len(sales_mat), "incoming_lines": len(incoming),
     "intransit_lines": len(intransit),
     "forecast_combos": len(forecast_mat), "forecast_months": sorted(fc_months),
+    "month_labels": month_labels,
     "notes": [
         "Inventory value = SUM(clabs x ma_price) per matnr+werks (421 rows have zero ma_price; included at 0 value).",
         "Inventory qty = SUM(clabs); HUOM = SUM(huom) (handling units) from fact_inventory.",
