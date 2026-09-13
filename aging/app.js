@@ -337,10 +337,11 @@ const COLS=[
   {k:'name11',t:'Vendor',cls:''},
   {k:'clabs',t:'Qty',cls:'num'},
   {k:'umrez',t:'Factor',cls:'num'},
+  {k:'huom',t:'HUOM (Qty/Factor)',cls:'num'},
   {k:'ntgew',t:'Net Wt (KG)',cls:'num'},
   {k:'weight_t',t:'Weight (T)',cls:'num'},
-  {k:'ma_price',t:'Price',cls:'num'},
-  {k:'value',t:'Value',cls:'num'},
+  {k:'ma_price',t:'mavg_cost',cls:'num'},
+  {k:'value',t:'Stock Value',cls:'num'},
   {k:'aging_bucket',t:'Bucket',cls:''},
 ];
 // Ext. Mat. Grp label by material-number series (first digit of zero-stripped matnr)
@@ -367,11 +368,14 @@ function renderTable(rows){
     // weight in tons = batch qty × net weight per unit (KG) / 1000
     const nt=(r.ntgew==null?null:r.ntgew);
     r.weight_t = (nt!=null && r.clabs!=null) ? r.clabs*nt/1000 : null;
+    // huom (handling-unit qty) = qty ÷ factor; — when factor missing
+    r.huom = (r.umrez && r.clabs!=null) ? r.clabs/r.umrez : null;
     return '<tr>'+
     cols.map(c=>{
       if(c.k==='aging_bucket') return `<td><span class="bucket-tag ${BUCKET_CLASS[r.aging_bucket]||''}">${esc(r.aging_bucket)}</span></td>`;
       if(c.k==='ewbez') return `<td>${esc(extGrpLabel(r))}</td>`;
       if(c.k==='weight_t') return `<td class="num">${r.weight_t==null?'—':fmtNum(r.weight_t,3)}</td>`;
+      if(c.k==='huom') return `<td class="num">${r.huom==null?'—':fmtNum(r.huom,2)}</td>`;
       if(c.k==='ntgew') return `<td class="num">${r.ntgew==null?'—':fmtNum(r.ntgew,3)}</td>`;
       if(c.k==='umrez') return `<td class="num">${r.umrez==null?'—':fmtNum(r.umrez,3)}</td>`;
       if(c.cls==='num'){const v=r[c.k];return `<td class="num">${c.k==='value'?fmtMoney(v):fmtNum(v,c.k==='clabs'?0:2)}</td>`;}
@@ -396,12 +400,13 @@ function csvFrom(rows, head, cols, filename){
 }
 
 function exportCSV(rows){
-  const head=['MATNR','MAKTX','WERKS','SALES_ORG','PLANT_CLASS','SLOC','NAME1','REGIO','CHARG','EXT_MAT_GRP','VENDOR','CLABS','UMREZ','NTGEW','WEIGHT_T','MA_PRICE','VALUE','AGING_BUCKET'];
-  const cols=['matnr','maktx','werks','bukrs','name2','lgort','name1','regio','charg','extgrp','name11','clabs','umrez','ntgew','weight_t','ma_price','value','aging_bucket'];
+  const head=['Material','Description','Plant','Sales Org','Plant Class','SLoc','Plant Name','Region','Batch','Ext. Mat. Grp','Vendor','Qty','Factor','HUOM (Qty/Factor)','Net Wt (KG)','Weight (T)','mavg_cost','Stock Value','Aging Bucket'];
+  const cols=['matnr','maktx','werks','bukrs','name2','lgort','name1','regio','charg','extgrp','name11','clabs','umrez','huom','ntgew','weight_t','ma_price','value','aging_bucket'];
   const data=rows.map(r=>{
     const o={...r};
     const nt=(r.ntgew==null?null:r.ntgew);
     o.weight_t=(nt!=null&&r.clabs!=null)?r.clabs*nt/1000:null;
+    o.huom=(r.umrez&&r.clabs!=null)?r.clabs/r.umrez:null;
     o.extgrp=extGrpLabel(r);
     return o;
   });
@@ -618,7 +623,7 @@ function initUI(){
   const topnSel=document.getElementById('f-topn');
   if(topnSel) topnSel.onchange=e=>{topMatState.limit=+e.target.value; renderTopMat(applyFilters());};
   document.getElementById('export-top-csv').onclick=()=>{
-    const head=['MATNR','MAKTX','EXPIRED','0-30','31-60','61-90','91-120','TOTAL_VALUE','TOTAL_QTY','FORECAST_QTY','AVG_MONTHLY_SALES','AVG_DAILY_SALES','COVERAGE_DAYS'];
+    const head=['Material','Description','Expired','0-30','31-60','61-90','91-120','Total Value','Total Qty','Forecast Qty','Avg Monthly Sales','Avg Daily Sales','Coverage Days'];
     const cols=['matnr','maktx','b_Expired','b_0-30','b_31-60','b_61-90','b_91-120','value','qty','forecastQty','avgMonthly','avgDaily','coverage'];
     const data=[...topMatState.data].map(r=>{
       const o={...r};
@@ -666,14 +671,14 @@ function initUI(){
   document.getElementById('page-size').onchange=e=>{state.pageSize=+e.target.value;state.page=1;renderTable(applyFilters());};
   document.getElementById('export-csv').onclick=()=>exportCSV(applyFilters());
   document.getElementById('export-dead-csv').onclick=()=>{
-    const head=['MATNR','MAKTX','MAT_GRUP','TOTAL_QTY','STOCK_VALUE','AGING_BUCKET','LAST_SALES_DATE'];
+    const head=['Material','Description','Mat. Grp','Total Qty','Stock Value','Aging Bucket','Last Sales Date'];
     const cols=['matnr','maktx','ewbez','qty','value','bucket','lastSales'];
     csvFrom(deadData, head, cols, 'dead_stock_no_sales_6mo.csv');
   };
   const exportGdrn=document.getElementById('export-gdrn-csv');
   if(exportGdrn) exportGdrn.onclick=()=>{
     const recs=gdrnFiltered();
-    const head=['DATE','PLANT','MBLNR','MATERIAL','DESCRIPTION','SLOC','BATCH','QTY','UOM','VALUE','USER'];
+    const head=['Date','Plant','Document No','Material','Description','SLoc','Batch','Qty','UoM','Value','User'];
     const cols=['date','werks','mblnr','matnr','maktx','lgort','charg','menge','meins','dmbtr','usnam'];
     csvFrom(recs, head, cols, 'goods_disposal_ytd.csv');
   };
