@@ -17,7 +17,6 @@ const HUB_ICONS = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8Z"/>',
   arrow: '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
-  lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
 };
 
 document.addEventListener('auth:ready', ev => {
@@ -105,30 +104,30 @@ document.addEventListener('auth:ready', ev => {
   }
 
   /* ---------- cards ---------- */
-  const dashboards = (HUB.dashboards || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  // The Supabase allowlist key is NOT always the folder name: the aging site
+  // is `aging/` but its DASHBOARD_ID is `material-aging`.
+  const authKeyOf = d => d.authId || d.id;
+
+  // Cards the signed-in user has NO grant for are hidden entirely — the hub
+  // only advertises what this account can actually open. (auth.js still shows
+  // the "no dashboards assigned" screen when the allowlist is empty.)
+  const dashboards = (HUB.dashboards || [])
+    .filter(d => allowed.has(authKeyOf(d)))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   grid.innerHTML = dashboards.map(d => {
-    // The Supabase allowlist key is NOT always the folder name: the aging site
-    // is `aging/` but its DASHBOARD_ID is `material-aging`.
-    const authKey = d.authId || d.id;
-    const ok = allowed.has(authKey);
     const accent = d.accent || 'var(--accent)';
     const ink = d.ink || '#0f141c';
 
-    // An allowed card is a real link (keyboard reachable). A locked card is an
-    // inert span: no href, no tab stop, aria-disabled for screen readers.
-    const hit = ok
-      ? `<a class="card-hit" href="${esc(targetFor(d))}" data-dashboard="${esc(d.id)}">
+    // Every rendered card is allowed, so it is a real link (keyboard reachable).
+    const hit = `<a class="card-hit" href="${esc(targetFor(d))}" data-dashboard="${esc(d.id)}">
            <span class="sr-only">Open the ${esc(d.title)}</span>
-         </a>`
-      : `<span class="card-hit" aria-disabled="true"></span>`;
+         </a>`;
 
-    const cta = ok
-      ? `<span class="btn cta" aria-hidden="true">Open dashboard ${svg('arrow', 'icon-directional')}</span>`
-      : `<span class="btn cta is-locked"><span class="btn-label">No access</span>${svg('lock', 'btn-lock')}</span>`;
+    const cta = `<span class="btn cta" aria-hidden="true">Open dashboard ${svg('arrow', 'icon-directional')}</span>`;
 
     return `
-      <article class="card${ok ? '' : ' is-locked'}" style="--card-accent:${esc(accent)};--card-ink:${esc(ink)}">
+      <article class="card" style="--card-accent:${esc(accent)};--card-ink:${esc(ink)}">
         ${hit}
         <div class="card-head">
           <div class="card-icon">${svg(d.icon || 'box')}</div>
@@ -146,7 +145,17 @@ document.addEventListener('auth:ready', ev => {
       </article>`;
   }).join('');
 
-  // Wire the handoff. Locked cards have no anchor, so nothing to wire.
+  // Nothing to show: say so rather than leaving an empty grid.
+  if (!dashboards.length) {
+    grid.innerHTML = `
+      <div class="grid-empty">
+        <h2>No dashboards assigned</h2>
+        <p>Your account has no dashboards assigned to it yet.
+           Contact your administrator to request access.</p>
+      </div>`;
+  }
+
+  // Wire the handoff.
   grid.querySelectorAll('.card-hit[data-dashboard]').forEach(a => {
     a.addEventListener('click', e => {
       e.preventDefault();
