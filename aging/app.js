@@ -91,9 +91,16 @@ function renderKPIs(a){
   const nearVal=nearB.reduce((s,b)=>s+(a.byBucket[b]?.val||0),0);
   const nearQty=nearB.reduce((s,b)=>s+(a.byBucket[b]?.qty||0),0);
   const nearBatches=nearB.reduce((s,b)=>s+(a.byBucket[b]?.batches||0),0);
+  // Non-Expired Damaged Value = value at storage location SLDG, all non-Expired buckets.
+  // Read the FULL payload (window.__AGING__) because DATA excludes '>120 Days' at load,
+  // and >120 Days is a valid non-expired bucket that belongs in this figure.
+  const sldgAll=(window.__AGING__&&window.__AGING__.records)||DATA;
+  const damaged=sldgAll.filter(r=>r.lgort==='SLDG'&&r.aging_bucket!=='Expired');
+  const damagedVal=damaged.reduce((s,r)=>s+(r.value||0),0);
   const cards=[
     {cls:'k-expired',label:'Expired Value',value:fmtMoney(a.expiredVal),sub:fmtNum(expiredPct,1)+'% of stock · '+fmtInt(a.byBucket['Expired'].batches)+' batches'},
     {cls:'k-near',label:'NEAR EXPIRY',value:fmtMoney(nearVal),sub:fmtNum(nearQty,0)+' units · '+fmtInt(nearBatches)+' batches (0-120d)'},
+    {cls:'k-damaged',label:'Non-Expired Damaged Value',value:fmtMoney(damagedVal),sub:fmtNum(damaged.length,0)+' batches (SLDG)'},
     {cls:'',label:'Goods Disposal YTD',value:fmtMoney(gdrnFiltered().reduce((s,r)=>s+(r.dmbtr||0),0)),sub:'Item Count · '+fmtInt(gdrnFiltered().length)},
     {cls:'k-active',label:'Slow Moving (no sales 6mo)',value:fmtMoney(a.deadStockVal),sub:fmtNum(deadPct,1)+'% of stock value'},
   ];
