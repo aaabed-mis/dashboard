@@ -202,11 +202,11 @@ con.close()
 
 # ---- vendor master (needed during aggregation for names) ----
 con = duckdb.connect(VENDORS, read_only=True)
-vrows = con.execute("SELECT lifnr, name1, land1, is_local, text1 FROM sap_prd.dim_vendors").fetchall()
+vrows = con.execute("SELECT lifnr, name1, land1, is_local, zterm_text FROM sap_prd.dim_vendors").fetchall()
 con.close()
 vendors = {}
-for lifnr, name1, land1, is_local, text1 in vrows:
-    vendors[str(lifnr)] = {"name": name1 or "", "country": land1 or "", "local": is_local or "", "grp": text1 or ""}
+for lifnr, name1, land1, is_local, zterm_text in vrows:
+    vendors[str(lifnr)] = {"name": name1 or "", "country": land1 or "", "local": is_local or "", "grp": zterm_text or ""}
 print("  vendor master:", len(vendors))
 
 # ============ PYTHON AGGREGATION ============
@@ -401,11 +401,11 @@ payload["kpi_open"] = {"lines": int(open_base[0]), "po": int(open_base[1]),
 
 # vendor master
 con = duckdb.connect(VENDORS, read_only=True)
-vrows = con.execute("SELECT lifnr, name1, land1, is_local, text1 FROM sap_prd.dim_vendors").fetchall()
+vrows = con.execute("SELECT lifnr, name1, land1, is_local, zterm_text FROM sap_prd.dim_vendors").fetchall()
 con.close()
 vendors = {}
-for lifnr, name1, land1, is_local, text1 in vrows:
-    vendors[str(lifnr)] = {"name": name1 or "", "country": land1 or "", "local": is_local or "", "grp": text1 or ""}
+for lifnr, name1, land1, is_local, zterm_text in vrows:
+    vendors[str(lifnr)] = {"name": name1 or "", "country": land1 or "", "local": is_local or "", "grp": zterm_text or ""}
 payload["vendors"] = vendors
 
 # material descriptions for the incoming-PO table (dim_material_master; fallback fact_inventory maktx)
