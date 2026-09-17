@@ -1,5 +1,5 @@
 window.__HUB__ = {
-  "built_at": "2026-09-16 05:08:35",
+  "built_at": "2026-09-17 05:02:21",
   "dashboards": [
     {
       "order": 1,
@@ -11,7 +11,7 @@ window.__HUB__ = {
       "local": "inventory/index.html",
       "accent": "#4f8cff",
       "icon": "box",
-      "refreshed": "2026-09-16 05:07:56",
+      "refreshed": "2026-09-17 05:01:48",
       "ink": "#0f141c"
     },
     {
@@ -24,7 +24,7 @@ window.__HUB__ = {
       "local": "purchasing/index.html",
       "accent": "#22c1a4",
       "icon": "cart",
-      "refreshed": "2026-09-16 05:08:21",
+      "refreshed": "2026-09-17 05:02:10",
       "ink": "#0f141c"
     },
     {
@@ -37,7 +37,7 @@ window.__HUB__ = {
       "local": "aging/index.html",
       "accent": "#f5a623",
       "icon": "hourglass",
-      "refreshed": "2026-09-16 05:07:32",
+      "refreshed": "2026-09-17 05:01:20",
       "ink": "#0f141c"
     }
   ]
