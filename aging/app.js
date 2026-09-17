@@ -21,15 +21,22 @@ const fmtNum = (n,d=2) => (n==null?0:n).toLocaleString('en-US',{minimumFractionD
 const fmtMoney = n => 'SAR '+fmtNum(n,0);
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+/* Shared state-matching predicate: respects werks/vkorg/mfrnr/extwg/matkl/bucket filters.
+   NOTE: does NOT include the search box — KPI figures are not narrowed by free-text search. */
+function matchesState(r){
+  if(state.werks.size && !state.werks.has(r.werks)) return false;
+  if(state.vkorg && r.vkorg!==state.vkorg) return false;
+  if(state.mfrnr.size && !state.mfrnr.has(String(r.mfrnr))) return false;
+  if(state.extwg && r.extwg!==state.extwg) return false;
+  if(state.matkl && r.matkl!==state.matkl) return false;
+  if(state.bucket && r.aging_bucket!==state.bucket) return false;
+  return true;
+}
+
 function applyFilters(){
   const q = state.search.trim().toLowerCase();
   return DATA.filter(r=>{
-    if(state.werks.size && !state.werks.has(r.werks)) return false;
-    if(state.vkorg && r.vkorg!==state.vkorg) return false;
-    if(state.mfrnr.size && !state.mfrnr.has(String(r.mfrnr))) return false;
-    if(state.extwg && r.extwg!==state.extwg) return false;
-    if(state.matkl && r.matkl!==state.matkl) return false;
-    if(state.bucket && r.aging_bucket!==state.bucket) return false;
+    if(!matchesState(r)) return false;
     if(q){
       const hay = (r.matnr+' '+(r.maktx||'')+' '+(r.charg||'')).toLowerCase();
       if(!hay.includes(q)) return false;
@@ -94,9 +101,10 @@ function renderKPIs(a){
   // Non-Expired Damaged Value = value at storage locations SLDG, DG01, DG04, all non-Expired buckets.
   // Read the FULL payload (window.__AGING__) because DATA excludes '>120 Days' at load,
   // and >120 Days is a valid non-expired bucket that belongs in this figure.
+  // Respect the active state filters (sales org, plant, etc.) via matchesState.
   const sldgAll=(window.__AGING__&&window.__AGING__.records)||DATA;
   const DmgLGORTS=['SLDG','DG01','DG04'];
-  const damaged=sldgAll.filter(r=>DmgLGORTS.includes(r.lgort)&&r.aging_bucket!=='Expired');
+  const damaged=sldgAll.filter(r=>DmgLGORTS.includes(r.lgort)&&r.aging_bucket!=='Expired'&&matchesState(r));
   const damagedVal=damaged.reduce((s,r)=>s+(r.value||0),0);
   const cards=[
     {cls:'k-expired',label:'Expired Value',value:fmtMoney(a.expiredVal),sub:fmtNum(expiredPct,1)+'% of stock · '+fmtInt(a.byBucket['Expired'].batches)+' batches'},
