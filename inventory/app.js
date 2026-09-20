@@ -25,7 +25,7 @@ const state = {
   vkorg:'', werks:new Set(), extwg:'', matkl:'', maabc:'', status:'', risk:'', replen:'', search:'',
   sortKey:'value', sortDir:-1, page:1, pageSize:50,
   colWidths:{},   // per-column px widths (Material Analysis resize)
-  hiddenCols:new Set(['vendor','wgbez','ewbez','maabc','umrez','plantCount','lastSale']),   // hidden-by-default columns
+  hiddenCols:new Set(['vendor','wgbez','ewbez','maabc','umrez','plantCount','lastSale','salesM0','salesM1','salesM2']),   // hidden-by-default columns
   poSortKey:'del_date', poSortDir:1, poPage:1, poPageSize:50, topN:50,
   itSortKey:'po', itSortDir:1, itPage:1, itPageSize:50
 };
@@ -248,7 +248,7 @@ function computeSkus(){
     if(state.replen && replen!==state.replen) continue;
     skus.push({matnr:m, maktx:mat.maktx||'', extwg:mat.extwg||'', ewbez:mat.ewbez||'',
       matkl:mat.matkl||'', wgbez:mat.wgbez||'', mfrnr:mat.mfrnr||'', name11:mat.name11||'',
-      qty, value, huom, ton:iv?iv.ton:0, maabc:mat.maabc||'', vendor:mat.name11||mat.name1||'', matkl:mat.matkl||'', ewbez:mat.ewbez||'', plantCount:iv?iv.plants.size:0, plantsArr:iv?[...iv.plants]:[],
+      qty, value, huom: Math.round((qty||0)/((umrez||1)||1)), ton:iv?iv.ton:0, maabc:mat.maabc||'', vendor:mat.name11||mat.name1||'', matkl:mat.matkl||'', ewbez:mat.ewbez||'', plantCount:iv?iv.plants.size:0, plantsArr:iv?[...iv.plants]:[],
       qW, vW, q365, v365, dailyDemand, coverage, coverageMo, fcQty, avgSales,
       salesM0, salesM1, salesM2,
       leadTime, safetyStock, target, excessQty, excessValue, reorder, umrez,
@@ -415,6 +415,7 @@ const SKU_COLS=[
   {k:'umrez',t:'Factor',cls:'num'},
   {k:'plantCount',t:'Plant',cls:'num'},
   {k:'qty',t:'Qty',cls:'num'},
+  {k:'huom',t:'HUOM',cls:'num'},
   {k:'value',t:'Value',cls:'num'},
   {k:'avgSales',t:'Average Sales',cls:'num'},
   {k:'salesM0',t:'Sales (M0)',cls:'num'},
@@ -433,8 +434,8 @@ const SKU_COLS=[
   {k:'reorder',t:'Reorder',cls:''},
   {k:'lastSale',t:'Last Sale',cls:''},
 ];
-const SKU_HEAD=['SKU','Description','Vendor','Mat Group','Ext Mat Group','ABC','Factor','Plant','Qty','Value','Average Sales','Sales (M0)','Sales (M1)','Sales (M2)','Coverage (mo)','Lead Time','Safety Stock','Ideal Stock','Sales Forecast','Excess Qty','Excess Value','Incoming Qty','Stock Status','Risk','Reorder','Last Sale'];
-const SKU_CSV_KEYS=['matnr','maktx','vendor','wgbez','ewbez','maabc','umrez','plantCount','qty','value','avgSales','salesM0','salesM1','salesM2','coverageMo','leadTime','safetyStock','target','fcQty','excessQty','excessValue','incQty','status','risk','reorder','lastSale'];
+const SKU_HEAD=['SKU','Description','Vendor','Mat Group','Ext Mat Group','ABC','Factor','Plant','Qty','HUOM','Value','Average Sales','Sales (M0)','Sales (M1)','Sales (M2)','Coverage (mo)','Lead Time','Safety Stock','Ideal Stock','Sales Forecast','Excess Qty','Excess Value','Incoming Qty','Stock Status','Risk','Reorder','Last Sale'];
+const SKU_CSV_KEYS=['matnr','maktx','vendor','wgbez','ewbez','maabc','umrez','plantCount','qty','huom','value','avgSales','salesM0','salesM1','salesM2','coverageMo','leadTime','safetyStock','target','fcQty','excessQty','excessValue','incQty','status','risk','reorder','lastSale'];
 function drawSkuTable(skus){
   const cols=SkuVisibleCols();
   SKU_VISIBLE=cols;
@@ -478,7 +479,7 @@ function drawSkuTable(skus){
   document.getElementById('next').disabled=state.page>=pages;
   setupSkuResize();
 }
-const SKU_DEF_WIDTHS={matnr:95,maktx:280,vendor:200,wgbez:110,ewbez:150,maabc:48,umrez:55,plantCount:58,qty:90,value:120,avgSales:95,salesM0:95,salesM1:95,salesM2:95,coverageMo:100,leadTime:68,safetyStock:90,target:95,fcQty:100,excessQty:88,excessValue:120,incQty:95,status:120,risk:95,reorder:88,lastSale:95};
+const SKU_DEF_WIDTHS={matnr:95,maktx:280,vendor:200,wgbez:110,ewbez:150,maabc:48,umrez:55,plantCount:58,qty:90,huom:70,value:120,avgSales:95,salesM0:95,salesM1:95,salesM2:95,coverageMo:100,leadTime:68,safetyStock:90,target:95,fcQty:100,excessQty:88,excessValue:120,incQty:95,status:120,risk:95,reorder:88,lastSale:95};
 let SKU_VISIBLE=SKU_COLS;   // columns currently shown (updated each draw)
 function SkuVisibleCols(){ return SKU_COLS.filter(c=>!state.hiddenCols.has(c.k)); }
 function initColMan(){
