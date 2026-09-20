@@ -98,18 +98,23 @@ function renderKPIs(a){
   const nearVal=nearB.reduce((s,b)=>s+(a.byBucket[b]?.val||0),0);
   const nearQty=nearB.reduce((s,b)=>s+(a.byBucket[b]?.qty||0),0);
   const nearBatches=nearB.reduce((s,b)=>s+(a.byBucket[b]?.batches||0),0);
-  // Non-Expired Damaged Value = value at storage locations SLDG, DG01, DG04, all non-Expired buckets.
-  // Read the FULL payload (window.__AGING__) because DATA excludes '>120 Days' at load,
-  // and >120 Days is a valid non-expired bucket that belongs in this figure.
-  // Respect the active state filters (sales org, plant, etc.) via matchesState.
-  const sldgAll=(window.__AGING__&&window.__AGING__.records)||DATA;
-  const DmgLGORTS=['SLDG','DG01','DG04'];
-  const damaged=sldgAll.filter(r=>DmgLGORTS.includes(r.lgort)&&r.aging_bucket!=='Expired'&&matchesState(r));
+  // Non-Expired Damaged Value = value at damaged storage locations (SLDG, DG01, DG04),
+  // NOT expired, sourced from fact_inventory (export embeds it as payload.damaged —
+  // includes non-batch MARD rows; expired = vfdat < today excluded). These rows are
+  // already non-expired, so state filters apply EXCEPT bucket (no aging_bucket field).
+  const dmgRows=(window.__AGING__&&window.__AGING__.damaged)||[];
+  const damaged=dmgRows.filter(r=>(
+     (!state.werks.size||state.werks.has(r.werks))
+  && (!state.vkorg||r.vkorg===state.vkorg)
+  && (!state.mfrnr.size||state.mfrnr.has(String(r.mfrnr)))
+  && (!state.extwg||r.extwg===state.extwg)
+  && (!state.matkl||r.matkl===state.matkl)
+  ));
   const damagedVal=damaged.reduce((s,r)=>s+(r.value||0),0);
   const cards=[
     {cls:'k-expired',label:'Expired Value',value:fmtMoney(a.expiredVal),sub:fmtNum(expiredPct,1)+'% of stock · '+fmtInt(a.byBucket['Expired'].batches)+' batches'},
     {cls:'k-near',label:'NEAR EXPIRY',value:fmtMoney(nearVal),sub:fmtNum(nearQty,0)+' units · '+fmtInt(nearBatches)+' batches (0-120d)'},
-    {cls:'k-damaged',label:'Non-Expired Damaged Value',value:fmtMoney(damagedVal),sub:fmtNum(damaged.length,0)+' batches (SLDG · DG01 · DG04)'},
+    {cls:'k-damaged',label:'Non-Expired Damaged Value',value:fmtMoney(damagedVal),sub:fmtNum(damaged.length,0)+' SLocs (SLDG · DG01 · DG04)'},
     {cls:'',label:'Goods Disposal YTD',value:fmtMoney(gdrnFiltered().reduce((s,r)=>s+(r.dmbtr||0),0)),sub:'Item Count · '+fmtInt(gdrnFiltered().length)},
     {cls:'k-active',label:'Slow Moving (no sales 6mo)',value:fmtMoney(a.deadStockVal),sub:fmtNum(deadPct,1)+'% of stock value'},
   ];

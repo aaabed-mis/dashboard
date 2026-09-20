@@ -163,6 +163,33 @@ try:
 except Exception as e:
     print("WARN: fact_gdrn join skipped:", e)
 
+# ---- Non-Expired Damaged Value: sourced from fact_inventory (user requirement) ----
+# Definition: LGORT in (SLDG, DG01, DG04), NOT expired (vfdat blank/00000000/NULL or >= today),
+# value = clabs * ma_price. Includes non-batch (MARD) rows. Carried as per-record rows so the
+# dashboard KPI can still apply the shared state filters (werks/vkorg/mfrnr/extwg/matkl).
+DAMAGED = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\duckdb\fact_inventory.duckdb"
+damaged_records = []
+try:
+    with duckdb.connect(DAMAGED, read_only=True) as con_d:
+        TODAY_D = TODAY.strftime("%Y%m%d")
+        for w, vk, mfrnr, extwg, matkl, lgort, clabs, mp in con_d.execute(f"""
+            SELECT werks, vkorg, mfrnr, extwg, matkl, lgort, clabs, ma_price
+            FROM sap_prd.fact_inventory
+            WHERE lgort IN ('SLDG','DG01','DG04')
+              AND (vfdat IS NULL OR vfdat = '' OR vfdat = '00000000' OR vfdat >= '{TODAY_D}')
+        """).fetchall():
+            cl = float(clabs) if clabs is not None else 0
+            price = float(mp) if mp is not None else 0
+            damaged_records.append({
+                "werks": w, "vkorg": vk, "mfrnr": mfrnr, "extwg": extwg, "matkl": matkl,
+                "lgort": lgort, "value": round(cl * price, 4),
+            })
+except Exception as e:
+    print("WARN: fact_inventory damaged join skipped:", e)
+    damaged_records = []
+print("Damaged (fact_inventory) records:", len(damaged_records),
+      "| value:", round(sum(r['value'] for r in damaged_records), 2))
+
 def get(rec, col):
     return rec.get(col) if col else None
 
@@ -200,12 +227,12 @@ meta = {
     "note": "aging_date/aging_bucket recomputed in export from charg (VKORG 1000) / vfdat (VKORG 6000); lgort absent in current source. SELECT * keeps export resilient to schema changes.",
 }
 with open(OUT, "w", encoding="utf-8") as f:
-    json.dump({"meta": meta, "records": data, "gdrn": gdrn}, f, ensure_ascii=False)
+    json.dump({"meta": meta, "records": data, "gdrn": gdrn, "damaged": damaged_records}, f, ensure_ascii=False)
 
 OUT_JS = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\Dashboards\dashboard\aging\data\data.js"
 with open(OUT_JS, "w", encoding="utf-8") as f:
     f.write("window.__AGING__ = ")
-    json.dump({"meta": meta, "records": data, "gdrn": gdrn}, f, ensure_ascii=False)
+    json.dump({"meta": meta, "records": data, "gdrn": gdrn, "damaged": damaged_records}, f, ensure_ascii=False)
     f.write(";")
 
 print("Rows written:", len(data))
