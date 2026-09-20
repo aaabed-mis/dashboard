@@ -68,6 +68,20 @@ DASHBOARDS = [
         "icon": "hourglass",
         "stamp_file": "aging/data/material_aging.json",
     },
+    {
+        "order": 4,
+        "id": "aging-aaa",
+        "authId": "material-aging-aaa",   # folder is aging-aaa/, Supabase key is material-aging-aaa
+        "title": "Material Aging Dashboard (No Vendor)",
+        "byline": "Batch stock value at risk · Aging buckets · Expiry · Dead stock · No vendor data",
+        "desc": "Vendor-free variant of the Material Aging dashboard: same aging buckets, KPI cards, "
+                "top materials, batch detail and dead stock, with the vendor filter, Vendor Insight "
+                "chart and vendor column removed.",
+        "local": "aging-aaa/index.html",
+        "accent": "#a78bfa",
+        "icon": "hourglass",
+        "stamp_file": "aging/data/material_aging.json",   # shares the aging export
+    },
 ]
 
 HEAD_BYTES = 8192

@@ -1,5 +1,5 @@
 window.__HUB__ = {
-  "built_at": "2026-09-20 09:26:02",
+  "built_at": "2026-09-20 11:29:54",
   "dashboards": [
     {
       "order": 1,
@@ -37,7 +37,20 @@ window.__HUB__ = {
       "local": "aging/index.html",
       "accent": "#f5a623",
       "icon": "hourglass",
-      "refreshed": "2026-09-20 09:22:18",
+      "refreshed": "2026-09-20 10:30:17",
+      "ink": "#0f141c"
+    },
+    {
+      "order": 4,
+      "id": "aging-aaa",
+      "authId": "material-aging-aaa",
+      "title": "Material Aging Dashboard (No Vendor)",
+      "byline": "Batch stock value at risk · Aging buckets · Expiry · Dead stock · No vendor data",
+      "desc": "Vendor-free variant of the Material Aging dashboard: same aging buckets, KPI cards, top materials, batch detail and dead stock, with the vendor filter, Vendor Insight chart and vendor column removed.",
+      "local": "aging-aaa/index.html",
+      "accent": "#a78bfa",
+      "icon": "hourglass",
+      "refreshed": "2026-09-20 10:30:17",
       "ink": "#0f141c"
     }
   ]
