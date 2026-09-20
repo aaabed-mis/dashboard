@@ -97,7 +97,10 @@ a{color:var(--accent)}
 .wrap{padding:0 26px}
 
 /* Card grid */
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin:26px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:26px 0 8px}
+@media (max-width:1200px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.grid{grid-template-columns:1fr}}
 .card{position:relative;display:flex;flex-direction:column;gap:12px;
   background:linear-gradient(180deg,color-mix(in srgb,var(--panel-2) 55%,var(--panel)),var(--panel));
   border:1px solid var(--line);border-radius:var(--radius);padding:20px 20px 18px;

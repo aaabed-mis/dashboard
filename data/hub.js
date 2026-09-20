@@ -1,5 +1,5 @@
 window.__HUB__ = {
-  "built_at": "2026-09-20 11:29:54",
+  "built_at": "2026-09-20 11:50:58",
   "dashboards": [
     {
       "order": 1,
@@ -51,6 +51,19 @@ window.__HUB__ = {
       "accent": "#a78bfa",
       "icon": "hourglass",
       "refreshed": "2026-09-20 10:30:17",
+      "ink": "#0f141c"
+    },
+    {
+      "order": 5,
+      "id": "ap",
+      "authId": "ap",
+      "title": "Accounts Payable Dashboard",
+      "byline": "AP exposure · Aging · Overdue liabilities · Vendor & payment risk",
+      "desc": "Outstanding AP position and aging, overdue liabilities, vendor concentration and payment-risk flags, with vendor and invoice detail and CSV export.",
+      "local": "ap/index.html",
+      "accent": "#e5484d",
+      "icon": "box",
+      "refreshed": "2026-09-17 14:27:50",
       "ink": "#0f141c"
     }
   ]

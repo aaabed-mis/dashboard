@@ -82,6 +82,19 @@ DASHBOARDS = [
         "icon": "hourglass",
         "stamp_file": "aging/data/material_aging.json",   # shares the aging export
     },
+    {
+        "order": 5,
+        "id": "ap",
+        "authId": "ap",
+        "title": "Accounts Payable Dashboard",
+        "byline": "AP exposure · Aging · Overdue liabilities · Vendor & payment risk",
+        "desc": "Outstanding AP position and aging, overdue liabilities, vendor concentration "
+                "and payment-risk flags, with vendor and invoice detail and CSV export.",
+        "local": "ap/index.html",
+        "accent": "#e5484d",
+        "icon": "box",
+        "stamp_file": "ap/data/ap.json",
+    },
 ]
 
 HEAD_BYTES = 8192
