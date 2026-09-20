@@ -98,6 +98,7 @@
     <div class="filter-group"><label>Company Code</label><select id="f-company" class="select"></select></div>
     <div class="filter-group"><label>Aging Bucket</label><select id="f-bucket" class="select"></select></div>
     <div class="filter-group"><label>Credit Days</label><select id="f-credit" class="select"></select></div>
+    <div class="filter-group"><label>Account Group</label><select id="f-accountgroup" class="select"></select></div>
     <div class="filter-group"><label>Due From</label><input id="f-dfrom" class="text" type="date" /></div>
     <div class="filter-group"><label>Due To</label><input id="f-dto" class="text" type="date" /></div>
     <div class="filter-group grow"><label>Vendor</label>
@@ -124,12 +125,16 @@
         <div class="chart-wrap tall"><canvas id="chart-local"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-head"><h2>By Company Code</h2><span class="hint">outstanding = Not Due + Overdue (SAR M)</span></div>
-        <div class="chart-wrap tall"><canvas id="chart-company"></canvas></div>
+        <div class="card-head"><h2>AP by Account Group</h2><span class="hint">outstanding AP by vendor account group (SAR)</span></div>
+        <div class="chart-wrap tall"><canvas id="chart-accountgroup"></canvas></div>
       </div>
-      <div class="card span-2">
+      <div class="card">
         <div class="card-head"><h2>Payment Terms Profile</h2><span class="hint">outstanding AP by term (SAR M)</span></div>
         <div class="chart-wrap tall"><canvas id="chart-terms"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>By Company Code</h2><span class="hint">outstanding = Not Due + Overdue (SAR M)</span></div>
+        <div class="chart-wrap tall"><canvas id="chart-company"></canvas></div>
       </div>
     </section>
 
@@ -195,7 +200,7 @@
     <script src="auth-config.js?v=20260913b"></script>
     <script src="auth.js?v=20260912m"></script>
     <script src="assets/chart.umd.min.js"></script>
-    <script src="data/data.js?v=20260917f"></script>
-    <script src="app.js?v=20260920a"></script>
+    <script src="data/data.js?v=20260920c"></script>
+    <script src="app.js?v=20260920c"></script>
 </body>
 </html>

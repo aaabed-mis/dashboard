@@ -13,11 +13,19 @@ const BUCKET_COLOR = {
 const BUCKET_CLASS = {
   'Not Due':'t-NotDue','0-30 Days':'t-Low','31-60 Days':'t-Low','61-90 Days':'t-High',
   '91-120 Days':'t-Critical','120+ Days':'t-Critical','Advance Payment':'t-NotDue'};
+const KTOKK_DESC = {
+  'BK01':'Domestic Vendor - Trade','BK02':'Domestic Vendor - Non Trade',
+  'BK03':'Foreign Vendor - Trade','BK04':'Foreign Vendor - Non Trade',
+  'BK05':'One Time Vendor','BK06':'Forwarding Agent',
+  'YB01':'Domestic Vendor - Trade','YB02':'Domestic Vendor - Non Trade',
+  'YB03':'Forwarding Agent','YB07':'Shipping Lines',
+  'YBEV':'Employee as vendor','YBIV':'Foreign Vendor - Trade',
+  'YBOV':'One Time Vendor','YBPG':'Partners','YBVE':'Foreign Vendor - Non Trade'};
 
 let DATA = null;            // window.__AP__
 let VENDOR_LIST = [];       // [code, name] for the vendor combo
 const state = {
-  company:'', vendor:'', bucket:'', credit:'', currency:'',
+  company:'', vendor:'', bucket:'', credit:'', currency:'', accountGroup:'',
   dfrom:'', dto:'',
   topN:15,
   vSortKey:'total', vSortDir:-1, vPage:1, vPageSize:20,
@@ -76,7 +84,7 @@ function itemObj(r){
   return {cc:r[0], vendor:r[1], belnr:r[2], gjahr:r[3], buzei:r[4],
     pdate:r[5], ddate:r[6], wrbtr:r[7], dmbtr:r[8], waers:r[9],
     block:r[10], zterm:r[11], text1:r[12], credit:r[13], due:r[14],
-    applied:r[15], remaining:r[16], bucket:r[17], name:r[18], local:r[19]};
+    applied:r[15], remaining:r[16], bucket:r[17], name:r[18], local:r[19], ktokk:r[20]};
 }
 function filteredItems(){
   const out = [];
@@ -85,6 +93,7 @@ function filteredItems(){
     if(state.vendor && r[1]!==state.vendor) continue;
     if(state.bucket && r[17]!==state.bucket) continue;
     if(state.currency && r[9]!==state.currency) continue;
+    if(state.accountGroup && (KTOKK_DESC[r[20]]||r[20]||'')!==state.accountGroup) continue;
     if(state.credit!=='' && r[13]!==parseInt(state.credit,10)) continue;
     if(state.dfrom && r[14] && r[14] < state.dfrom) continue;
     if(state.dto && r[14] && r[14] > state.dto) continue;
@@ -205,10 +214,23 @@ function renderTerms(t){
     datasets:[{data:top.map(e=>e[1].open),backgroundColor:top.map((_,i)=>'hsl('+(12+i*6)+' 70% 52%)'),borderRadius:6}]},
     options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false},
       tooltip:{callbacks:{label:c=>' '+fmtAP(c.raw)+' / '+fmtInt(top[c.dataIndex][1].count)+' lines'}}},
-      scales:{x:{ticks:{callback:v=>fmtM(v)}}}}});
-}
-
-/* ---------- management attention ---------- */
+      scales:{x:{ticks:{callback:v=>fmtM(v)}}}}});}
+      function renderAccountGroups(rows){
+        // Pie: outstanding AP grouped by KTOKK DESCRIPTION (consolidates codes
+        // that share a label, e.g. BK01/YB01 -> 'Domestic Vendor - Trade').
+        const g={};
+        for(const r of rows){
+          const code=r[20]||'';
+          const k=KTOKK_DESC[code]||code||'—';
+          const o=g[k]||(g[k]={open:0,count:0});
+          o.open+=r[16]||0; o.count++;
+        }
+        const entries=Object.entries(g).sort((a,b)=>b[1].open-a[1].open);
+        const labels=entries.map(e=>e[0]);
+        makeChart('chart-accountgroup',{type:'pie',data:{labels,
+          datasets:[{data:entries.map(e=>e[1].open),backgroundColor:entries.map((_,i)=>'hsl('+(200+i*36)%360+' 65% 50%)'),borderRadius:4}]},
+          options:{maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}},
+            tooltip:{callbacks:{label:c=>' '+c.label+': '+fmtAP(c.raw)+' ('+fmtNum(c.raw/(entries.reduce((s,e)=>s+e[1].open,0)||1)*100,1)+'%) · '+fmtInt(entries[c.dataIndex][1].count)+' lines'}}}}});}
 function renderAttention(rows, total, vendors){
   const b=byBucket(rows);
   const over30=b['31-60 Days']+b['61-90 Days']+b['91-120 Days']+b['120+ Days'];
@@ -342,6 +364,7 @@ function refresh(){
   renderLocal(local);
   renderCompany(byGroup(rows,r=>r[0]));
   renderTerms(byTerms(rows));
+  renderAccountGroups(rows);
   const vendors=vendorRows(rows);
   const vendTotal=vendors.reduce((s,v)=>s+v.total,0);   // incl advances -> matches the table's Total Outstanding
   const vrows=vendors.map(v=>({...v,pct:vendTotal>0?v.total/vendTotal*100:0}));
@@ -414,11 +437,13 @@ function initFilters(){
   fillSelect('f-credit',credits.map(c=>[c,'Credit '+c+'d']),'All');
   const curs=[...new Set(all.map(r=>r[9]))].sort();
   fillSelect('f-currency',curs.map(c=>[c,c]),'All');
+  const ags=[...new Set(all.map(r=>KTOKK_DESC[r[20]]||r[20]||'Unknown').filter(Boolean))].sort();
+  fillSelect('f-accountgroup',ags.map(a=>[a,a]),'All');
 }
 function bindFilters(){
   const map={
     'f-company':'company','f-bucket':'bucket',
-    'f-credit':'credit','f-currency':'currency',
+    'f-credit':'credit','f-currency':'currency','f-accountgroup':'accountGroup',
     'f-dfrom':'dfrom','f-dto':'dto'};
   for(const id in map){
     const el=document.getElementById(id);
@@ -432,7 +457,7 @@ function bindFilters(){
     Object.keys(state).forEach(k=>{ if(typeof state[k]==='string') state[k]=''; });
     state.topN=15; state.vSortKey='total'; state.vSortDir=-1; state.vPage=1;
     state.dSortKey='remaining'; state.dSortDir=-1; state.dPage=1;
-    ['f-company','f-bucket','f-credit','f-currency'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+    ['f-company','f-bucket','f-credit','f-currency','f-accountgroup'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
     ['f-dfrom','f-dto'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
     resetVendorCombo();
     refresh();

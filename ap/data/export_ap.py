@@ -37,7 +37,7 @@ ADV_DB = os.path.join(DUCK, "fact_accounts_payable_advance.duckdb")
 
 COLS = ("bukrs,lifnr,belnr,gjahr,buzei,budat,bldat,wrbtr,dmbtr,waers,zlspr,"
         "zterm,text1,credit_days,due_date,applied_amount,remaining_amount,"
-        "overdue_bucket,name1,is_local")
+        "overdue_bucket,name1,is_local,ktokk")
 
 def fetch(db, table):
     con = duckdb.connect(db, read_only=True)
@@ -71,7 +71,7 @@ for r in rows:
         int(r[13]) if r[13] is not None else 0,
         d(r[14]),
         round(float(r[15]), 2), round(float(r[16]), 2),
-        r[17], r[18] or "", r[19],
+        r[17], r[18] or "", r[19], r[20] or "",
     ])
 
 n = len(items)
