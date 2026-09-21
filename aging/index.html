@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Material Aging Dashboard</title>
   <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=20260914b" />
+  <link rel="stylesheet" href="styles.css?v=20260921b" />
 </head>
 <body>
   <!-- Access gate. No password field: sign-in happens at the hub.
@@ -171,6 +171,10 @@
       <h2>Batch Detail</h2>
       <div class="table-actions">
         <span id="table-count" class="hint"></span>
+        <div class="colman">
+          <button id="colman-toggle" class="btn-export" title="Show / hide columns">⚙ Columns</button>
+          <div class="colman-menu" id="colman-menu"></div>
+        </div>
         <button id="export-csv" class="btn-export">Export CSV</button>
       </div>
     </div>
@@ -230,7 +234,7 @@
   <script src="auth-config.js?v=20260913b"></script>
   <script src="auth.js?v=20260912m"></script>
   <script src="assets/chart.umd.min.js"></script>
-  <script src="data/data.js?v=20260921a"></script>
-  <script src="app.js?v=20260920d"></script>
+  <script src="data/data.js?v=20260921b"></script>
+  <script src="app.js?v=20260921d"></script>
 </body>
 </html>

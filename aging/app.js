@@ -11,7 +11,8 @@ let DATA = [];
 let META = {};
 const state = {
   werks: new Set(), vkorg: "", mfrnr: new Set(), extwg: "", matkl: "", bucket: "", search: "",
-  sortKey: "value", sortDir: -1, page: 1, pageSize: 50
+  sortKey: "value", sortDir: -1, page: 1, pageSize: 50,
+  hiddenCols: new Set(['bukrs','name2','ntgew','umrez','ma_price','ewbez'])
 };
 const charts = {};
 
@@ -48,10 +49,10 @@ function applyFilters(){
 /* ---------- aggregation ---------- */
 function aggregate(rows){
   let totalQty=0,totalVal=0,expiredQty=0,expiredVal=0,batches=rows.length;
-  let deadStockVal=0, sl01ExpiredVal=0;
+  let deadStockVal=0, sl01ExpiredVal=0, deadQty=0, deadHuom=0; const deadChargSet=new Set();
   const seenMat=new Map(); // matnr -> avg_monthly_active (distinct, avoids batch double-count)
   const byBucket={}, byRegion={}, byPlant={}, byMgrp={}, byVendor={}, byRegionBucket={}, byPlantBucket={}, byMgrpBucket={}, byVendorBucket={}, byMatnr={}, byMatnrBucket={};
-  BUCKETS.forEach(b=>byBucket[b]={qty:0,val:0,batches:0});
+  BUCKETS.forEach(b=>byBucket[b]={qty:0,val:0,batches:0,huom:0,chargSet:new Set()});
   for(const r of rows){
     const q=r.clabs||0, v=r.value||0;
     totalQty+=q; totalVal+=v;
@@ -59,7 +60,7 @@ function aggregate(rows){
       expiredQty+=q; expiredVal+=v;
       if(r.lgort==='SL01') sl01ExpiredVal+=v;
     }
-    const b=r.aging_bucket; if(byBucket[b]){byBucket[b].qty+=q;byBucket[b].val+=v;byBucket[b].batches++;}
+    const b=r.aging_bucket; if(byBucket[b]){byBucket[b].qty+=q;byBucket[b].val+=v;byBucket[b].batches++;byBucket[b].huom+=(r.umrez&&q)?q/r.umrez:0;byBucket[b].chargSet.add(r.charg);}
     const rg=r.regio||'(none)'; byRegion[rg]=(byRegion[rg]||0)+v;
     if(!byRegionBucket[rg]){byRegionBucket[rg]={};BUCKETS.forEach(x=>byRegionBucket[rg][x]=0);}
     if(byRegionBucket[rg][b]!==undefined)byRegionBucket[rg][b]+=v;
@@ -78,6 +79,7 @@ function aggregate(rows){
     // dead stock = material with NO sales in last 6 months (avg_monthly_active null/0)
     const am=r.avg_monthly_active;
     if(am===null||am===undefined||am===0){
+      deadQty+=q; deadHuom+=(r.umrez&&q)?q/r.umrez:0; deadChargSet.add(r.charg);
       if(!seenMat.has(r.matnr)) deadStockVal+=v;
     }
     if(!seenMat.has(r.matnr)) seenMat.set(r.matnr, am);
@@ -86,18 +88,17 @@ function aggregate(rows){
   let totalAvgDaily=0;
   for(const [,am] of seenMat){ if(am) totalAvgDaily+=am/30; }
   const coverageDays=totalAvgDaily>0?totalQty/totalAvgDaily:null;
-  return {totalQty,totalVal,expiredQty,expiredVal,batches,deadStockVal,sl01ExpiredVal,coverageDays,byBucket,byRegion,byPlant,byMgrp,byVendor,byRegionBucket,byPlantBucket,byMgrpBucket,byVendorBucket,byMatnr,byMatnrBucket};
+  return {totalQty,totalVal,expiredQty,expiredVal,batches,deadStockVal,deadQty,deadHuom,deadChargSet,sl01ExpiredVal,coverageDays,byBucket,byRegion,byPlant,byMgrp,byVendor,byRegionBucket,byPlantBucket,byMgrpBucket,byVendorBucket,byMatnr,byMatnrBucket};
 }
 
 /* ---------- KPIs ---------- */
 function renderKPIs(a){
-  const expiredPct=a.totalVal?a.expiredVal/a.totalVal*100:0;
-  const deadPct=a.totalVal?a.deadStockVal/a.totalVal*100:0;
   // Near expiry = total across all in-scope future buckets (0-30 .. 91-120)
   const nearB=['0-30','31-60','61-90','91-120'];
   const nearVal=nearB.reduce((s,b)=>s+(a.byBucket[b]?.val||0),0);
   const nearQty=nearB.reduce((s,b)=>s+(a.byBucket[b]?.qty||0),0);
-  const nearBatches=nearB.reduce((s,b)=>s+(a.byBucket[b]?.batches||0),0);
+  const nearHuom=nearB.reduce((s,b)=>s+(a.byBucket[b]?.huom||0),0);
+  const nearCharg=new Set(); nearB.forEach(b=>(a.byBucket[b]?.chargSet||[]).forEach(c=>nearCharg.add(c)));
   // Non-Expired Damaged Value = value at damaged storage locations (SLDG, DG01, DG04),
   // NOT expired, sourced from fact_inventory (export embeds it as payload.damaged —
   // includes non-batch MARD rows; expired = vfdat < today excluded). These rows are
@@ -111,12 +112,21 @@ function renderKPIs(a){
   && (!state.matkl||r.matkl===state.matkl)
   ));
   const damagedVal=damaged.reduce((s,r)=>s+(r.value||0),0);
+  const dmgQty=damaged.reduce((s,r)=>s+(r.clabs||0),0);
+  const dmgHuom=damaged.reduce((s,r)=>s+((r.umrez&&r.clabs)?r.clabs/r.umrez:0),0);
+  const dmgCharg=new Set(damaged.map(r=>r.charg).filter(Boolean));
+  // Goods disposal (fact_gdrn), filter-scoped
+  const gdRows=gdrnFiltered();
+  const gdVal=gdRows.reduce((s,r)=>s+(r.dmbtr||0),0);
+  const gdQty=gdRows.reduce((s,r)=>s+(r.menge||0),0);
+  const gdHuom=gdRows.reduce((s,r)=>s+((r.umrez&&r.menge)?r.menge/r.umrez:0),0);
+  const gdCharg=new Set(gdRows.map(r=>r.charg).filter(Boolean));
   const cards=[
-    {cls:'k-expired',label:'Expired Value',value:fmtMoney(a.expiredVal),sub:fmtNum(expiredPct,1)+'% of stock · '+fmtInt(a.byBucket['Expired'].batches)+' batches'},
-    {cls:'k-near',label:'NEAR EXPIRY',value:fmtMoney(nearVal),sub:fmtNum(nearQty,0)+' units · '+fmtInt(nearBatches)+' batches (0-120d)'},
-    {cls:'k-damaged',label:'Non-Expired Damaged Value',value:fmtMoney(damagedVal),sub:fmtNum(damaged.length,0)+' SLocs (SLDG · DG01 · DG04)'},
-    {cls:'',label:'Goods Disposal YTD',value:fmtMoney(gdrnFiltered().reduce((s,r)=>s+(r.dmbtr||0),0)),sub:'Item Count · '+fmtInt(gdrnFiltered().length)},
-    {cls:'k-active',label:'Slow Moving (no sales 6mo)',value:fmtMoney(a.deadStockVal),sub:fmtNum(deadPct,1)+'% of stock value'},
+    {cls:'k-expired',label:'Expired Value',value:fmtMoney(a.expiredVal),sub:'Qty (PC) '+fmtNum(a.byBucket['Expired'].qty,0)+' · Qty (HUOM) '+fmtNum(a.byBucket['Expired'].huom,0)+' · '+fmtInt(a.byBucket['Expired'].chargSet.size)+' batches'},
+    {cls:'k-near',label:'NEAR EXPIRY',value:fmtMoney(nearVal),sub:'Qty (PC) '+fmtNum(nearQty,0)+' · Qty (HUOM) '+fmtNum(nearHuom,0)+' · '+fmtInt(nearCharg.size)+' batches'},
+    {cls:'k-damaged',label:'Non-Expired Damaged Value',value:fmtMoney(damagedVal),sub:'Qty (PC) '+fmtNum(dmgQty,0)+' · Qty (HUOM) '+fmtNum(dmgHuom,0)+' · '+fmtInt(dmgCharg.size)+' batches'},
+    {cls:'',label:'Goods Disposal YTD',value:fmtMoney(gdVal),sub:'Qty (PC) '+fmtNum(gdQty,0)+' · Qty (HUOM) '+fmtNum(gdHuom,0)+' · '+fmtInt(gdCharg.size)+' batches'},
+    {cls:'k-active',label:'Slow Moving (no sales 6mo)',value:fmtMoney(a.deadStockVal),sub:'Qty (PC) '+fmtNum(a.deadQty,0)+' · Qty (HUOM) '+fmtNum(a.deadHuom,0)+' · '+fmtInt(a.deadChargSet.size)+' batches'},
   ];
   document.getElementById('kpis').innerHTML=cards.map(c=>`
     <div class="kpi ${c.cls}">
@@ -356,10 +366,11 @@ const COLS=[
   {k:'charg',t:'Batch',cls:''},
   {k:'ewbez',t:'Ext. Mat. Grp',cls:''},
   {k:'name11',t:'Vendor',cls:''},
-  {k:'clabs',t:'Qty',cls:'num'},
+  {k:'clabs',t:'Qty (PC)',cls:'num'},
   {k:'umrez',t:'Factor',cls:'num'},
-  {k:'huom',t:'HUOM (Qty/Factor)',cls:'num'},
-  {k:'ntgew',t:'Net Wt (KG)',cls:'num'},
+  {k:'huom',t:'Qty (HUOM)',cls:'num'},
+  {k:'meins_huom',t:'HUOM',cls:''},
+  {k:'ntgew',t:'Unit Weight (KG)',cls:'num'},
   {k:'weight_t',t:'Weight (T)',cls:'num'},
   {k:'ma_price',t:'mavg_cost',cls:'num'},
   {k:'value',t:'Stock Value',cls:'num'},
@@ -372,8 +383,29 @@ function extGrpLabel(r){
   if(m[0]==='3') return 'Raw Materials';
   return r.ewbez||r.extwg||'';
 }
+// Column chooser for the Batch Detail table: show/hide columns (mirrors inventory Material Analysis).
+function DetailVisibleCols(){ const vis=COLS.filter(c=>!state.hiddenCols.has(c.k)); return vis.length?vis:COLS; }
+function initColMan(){
+  const menu=document.getElementById('colman-menu'); if(!menu) return;
+  menu.innerHTML=COLS.map(c=>{
+    const on=!state.hiddenCols.has(c.k);
+    return `<label class="colman-item"><input type="checkbox" data-k="${c.k}" ${on?'checked':''}><span>${esc(c.t)}</span></label>`;
+  }).join('');
+  menu.querySelectorAll('input').forEach(inp=>{
+    inp.onchange=()=>{
+      if(inp.checked) state.hiddenCols.delete(inp.dataset.k);
+      else state.hiddenCols.add(inp.dataset.k);
+      refresh();
+    };
+  });
+  document.getElementById('colman-toggle').onclick=e=>{
+    e.stopPropagation();
+    menu.classList.toggle('open');
+  };
+  document.addEventListener('click',e=>{ if(!e.target.closest('.colman')) menu.classList.remove('open'); });
+}
 function renderTable(rows){
-  const cols=COLS;
+  const cols=DetailVisibleCols();
   document.querySelector('#detail-table thead').innerHTML=
     '<tr>'+cols.map(c=>`<th data-k="${c.k}" class="${c.cls}">${c.t}${state.sortKey===c.k?(state.sortDir<0?' ▼':' ▲'):''}</th>`).join('')+'</tr>';
   const sorted=[...rows].sort((x,y)=>{
@@ -397,6 +429,7 @@ function renderTable(rows){
       if(c.k==='ewbez') return `<td>${esc(extGrpLabel(r))}</td>`;
       if(c.k==='weight_t') return `<td class="num">${r.weight_t==null?'—':fmtNum(r.weight_t,3)}</td>`;
       if(c.k==='huom') return `<td class="num">${r.huom==null?'—':fmtNum(r.huom,2)}</td>`;
+      if(c.k==='meins_huom') return `<td>${esc(r.meins_huom||'—')}</td>`;
       if(c.k==='ntgew') return `<td class="num">${r.ntgew==null?'—':fmtNum(r.ntgew,3)}</td>`;
       if(c.k==='umrez') return `<td class="num">${r.umrez==null?'—':fmtNum(r.umrez,3)}</td>`;
       if(c.cls==='num'){const v=r[c.k];return `<td class="num">${c.k==='value'?fmtMoney(v):fmtNum(v,c.k==='clabs'?0:2)}</td>`;}
@@ -421,8 +454,9 @@ function csvFrom(rows, head, cols, filename){
 }
 
 function exportCSV(rows){
-  const head=['Material','Description','Plant','Sales Org','Plant Class','SLoc','Plant Name','Region','Batch','Ext. Mat. Grp','Vendor','Qty','Factor','HUOM (Qty/Factor)','Net Wt (KG)','Weight (T)','mavg_cost','Stock Value','Aging Bucket'];
-  const cols=['matnr','maktx','werks','bukrs','name2','lgort','name1','regio','charg','extgrp','name11','clabs','umrez','huom','ntgew','weight_t','ma_price','value','aging_bucket'];
+  const cols=DetailVisibleCols();
+  const head=cols.map(c=>c.t);
+  const keys=cols.map(c=>c.k);
   const data=rows.map(r=>{
     const o={...r};
     const nt=(r.ntgew==null?null:r.ntgew);
@@ -431,7 +465,7 @@ function exportCSV(rows){
     o.extgrp=extGrpLabel(r);
     return o;
   });
-  csvFrom(data, head, cols, 'material_aging_filtered.csv');
+  csvFrom(data, head, keys, 'material_aging_filtered.csv');
 }
 
 /* ---------- dead stock table ---------- */
@@ -691,6 +725,7 @@ function initUI(){
   document.getElementById('next').onclick=()=>{state.page++;renderTable(applyFilters());};
   document.getElementById('page-size').onchange=e=>{state.pageSize=+e.target.value;state.page=1;renderTable(applyFilters());};
   document.getElementById('export-csv').onclick=()=>exportCSV(applyFilters());
+  initColMan();
   document.getElementById('export-dead-csv').onclick=()=>{
     const head=['Material','Description','Mat. Grp','Total Qty','Stock Value','Aging Bucket','Last Sales Date'];
     const cols=['matnr','maktx','ewbez','qty','value','bucket','lastSales'];

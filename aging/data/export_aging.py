@@ -121,6 +121,22 @@ try:
 except Exception as e:
     print("WARN: dim_plants join skipped:", e)
 
+# Handling-unit unit of measure (MEINS_HUOM) per material, from dim_material_master.
+# Join on the raw (zero-padded CHAR18) matnr — matches the aging table's matnr format.
+MM = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\duckdb\dim_material_master.duckdb"
+huom_unit = {}
+umrez_map = {}
+try:
+    with duckdb.connect(MM, read_only=True) as con_mm:
+        for mat, huom, umrez in con_mm.execute(
+            "SELECT matnr, meins_huom, umrez FROM sap_prd.dim_material_master"
+        ).fetchall():
+            if mat:
+                huom_unit[mat] = huom
+                umrez_map[mat] = umrez
+except Exception as e:
+    print("WARN: dim_material_master meins_huom join skipped:", e)
+
 # Forecast per material, from fact_forecast (sum of zbvalue / zbqty across months/plants).
 FC = r"C:\Users\c.crizaldo\OneDrive - Ahmad A. Abed Trading Co. Ltd\Documents\duckdb\fact_forecast.duckdb"
 forecast = {}
@@ -159,6 +175,7 @@ try:
                 "dmbtr": round(float(row[9]), 2) if row[9] is not None else None,
                 "usnam": row[10],
                 "vkorg": row[11],
+                "umrez": umrez_map.get(row[3]),
             })
 except Exception as e:
     print("WARN: fact_gdrn join skipped:", e)
@@ -172,18 +189,19 @@ damaged_records = []
 try:
     with duckdb.connect(DAMAGED, read_only=True) as con_d:
         TODAY_D = TODAY.strftime("%Y%m%d")
-        for w, vk, mfrnr, extwg, matkl, lgort, clabs, mp in con_d.execute(f"""
-            SELECT werks, vkorg, mfrnr, extwg, matkl, lgort, clabs, ma_price
-            FROM sap_prd.fact_inventory
-            WHERE lgort IN ('SLDG','DG01','DG04')
-              AND (vfdat IS NULL OR vfdat = '' OR vfdat = '00000000' OR vfdat >= '{TODAY_D}')
-        """).fetchall():
-            cl = float(clabs) if clabs is not None else 0
-            price = float(mp) if mp is not None else 0
-            damaged_records.append({
-                "werks": w, "vkorg": vk, "mfrnr": mfrnr, "extwg": extwg, "matkl": matkl,
-                "lgort": lgort, "value": round(cl * price, 4),
-            })
+        for w, vk, mfrnr, extwg, matkl, lgort, clabs, mp, umrez, charg in con_d.execute(f"""
+                    SELECT werks, vkorg, mfrnr, extwg, matkl, lgort, clabs, ma_price, umrez, charg
+                    FROM sap_prd.fact_inventory
+                    WHERE lgort IN ('SLDG','DG01','DG04')
+                      AND (vfdat IS NULL OR vfdat = '' OR vfdat = '00000000' OR vfdat >= '{TODAY_D}')
+                """).fetchall():
+                    cl = float(clabs) if clabs is not None else 0
+                    price = float(mp) if mp is not None else 0
+                    damaged_records.append({
+                        "werks": w, "vkorg": vk, "mfrnr": mfrnr, "extwg": extwg, "matkl": matkl,
+                        "lgort": lgort, "value": round(cl * price, 4),
+                        "clabs": cl, "umrez": umrez, "charg": charg,
+                    })
 except Exception as e:
     print("WARN: fact_inventory damaged join skipped:", e)
     damaged_records = []
@@ -206,6 +224,7 @@ for r in rows:
     pdim = plant_dim.get(str(rec.get(C_WERKS) or '').strip()) or {}
     rec["bukrs"] = pdim.get("bukrs")     # sales org from dim_plants
     rec["name2"] = pdim.get("name2")     # plant classification from dim_plants
+    rec["meins_huom"] = huom_unit.get(rec.get(C_MATNR))  # HUOM unit from dim_material_master
     s = sales.get(rec.get(C_MATNR))
     rec["avg_monthly_active"] = round(s["avg_monthly_active"], 4) if (s and s["avg_monthly_active"] is not None) else None
     rec["total_qty_6mo"] = round(s["total_qty_6mo"], 4) if (s and s["total_qty_6mo"] is not None) else None
