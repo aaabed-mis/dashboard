@@ -649,9 +649,10 @@ const IT_COLS=[
   {k:'maktx',t:'Description',cls:''},{k:'fromName',t:'From Plant',cls:''},
   {k:'toName',t:'To Plant',cls:''},{k:'qty',t:'Qty',cls:'num'},{k:'uom',t:'UoM',cls:''},
   {k:'value',t:'Value',cls:'num'},{k:'po_date',t:'PO Date',cls:''},
+  {k:'aging_days',t:'Aging Days',cls:'num'},
 ];
-const IT_HEAD=['PO','Item','Material','Description','From Plant','To Plant','Qty','UoM','Value','PO Date'];
-const IT_CSV_KEYS=['po','item','matnr','maktx','fromName','toName','qty','uom','value','po_date'];
+const IT_HEAD=['PO','Item','Material','Description','From Plant','To Plant','Qty','UoM','Value','PO Date','Aging Days'];
+const IT_CSV_KEYS=['po','item','matnr','maktx','fromName','toName','qty','uom','value','po_date','aging_days'];
 function plantName(p){ const pl=DATA.plants||{}; return (pl[p]&&pl[p].name1)||''; }
 function plantLabel(p){ const n=plantName(p); return p ? (n ? p+' – '+n : p) : '—'; }
 function itValue(r){ const mp=(DATA.mats[r.matnr]&&DATA.mats[r.matnr].ma_price)||0; const u=r.umrez||1; return r.qty*u*mp; }
@@ -691,6 +692,7 @@ function drawItTable(rows){
       if(c.k==='matnr') return `<td>${esc(strip0(v))}</td>`;
       if(c.k==='qty') return `<td class="num">${fmtInt(v)}</td>`;
       if(c.k==='value') return `<td class="num">${fmtInt(v)}</td>`;
+      if(c.k==='aging_days') return `<td class="num${v>30?' aging-high':''}">${v==null?'—':fmtInt(v)}</td>`;
       if(c.k==='po_date') return `<td>${v?esc(v.slice(0,10)):'—'}</td>`;
       return `<td>${esc(v==null?'':v)}</td>`;
     }).join('')+'</tr>').join('');

@@ -381,15 +381,20 @@ print("Reading fact_intransit ...")
 intransit = []
 try:
     con = duckdb.connect(INTRANSIT, read_only=True)
-    for po, item, matnr, frm, to, sloc, qty, umrez, uom, poc in con.execute(
-        "SELECT DISTINCT po_number, po_item, material_number, \"from\", \"to\", storage_location, quantity, umrez, order_uom, po_creation_date "
+    for po, item, matnr, frm, to, sloc, qty, umrez, uom, ae_dt, ag in con.execute(
+        "SELECT DISTINCT ebeln, ebelp, matnr, \"from\", \"to\", lgort, menge, umrez, meins, aedat, aging_days "
         "FROM sap_prd.fact_intransit"
     ).fetchall():
+        po_date = None
+        if ae_dt:
+            s = str(ae_dt).strip()
+            if len(s) == 8 and s.isdigit():
+                po_date = f"{s[0:4]}-{s[4:6]}-{s[6:8]}"
         intransit.append({
             "po": po or "", "item": item or "", "matnr": strip_matnr(matnr),
             "from": frm or "", "to": to or "", "sloc": sloc or "",
             "qty": round(float(qty or 0), 4), "umrez": float(umrez or 1.0), "uom": uom or "",
-            "po_date": poc.isoformat() if poc else None,
+            "po_date": po_date, "aging_days": int(ag) if ag is not None else None,
         })
     con.close()
 except Exception as e:
@@ -447,7 +452,7 @@ meta = {
         "Sales qty = SUM(qty_in_sku) (SKU/base units); value windows use NET_VALUE (returns & credit memos negative).",
         "Demand windows anchored to ref_date (max sales date).",
         "Incoming = open PO lines (all delivery dates; overdue flagged client-side).",
-        "Intransit = fact_intransit DISTINCT (po,item,matnr,from,to,sloc,qty) — source rows are ~27x duplicated; no value column (client-side value via ma_price).",
+        "Intransit = fact_intransit DISTINCT (po,item,matnr,from,to,sloc,qty) — source rows are ~27x duplicated; no value column (client-side value via ma_price); Aging Days = days from AEDAT to export run (snapshot, refreshes on re-export).",
         "Forecast = fact_forecast per material x plant (current month, zbqty/zbvalue).",
         "Aging buckets mirror MaterialAgingDashboard: VKORG 1000/blank -> CHARG date; VKORG 6000 -> VFDAT; days from export run date.",
         "Aging source of truth = material_aging.duckdb (same table as Material Aging Dashboard) so Expired/Near-Expiry KPIs match it exactly.",
