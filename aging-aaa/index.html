@@ -878,7 +878,7 @@ function renderKPIs(a){
     {cls:'k-expired',label:'Expired Value',value:fmtMoney(a.expiredVal),sub:'Qty (PC) '+fmtNum(a.byBucket['Expired'].qty,0)+' · Qty (HUOM) '+fmtNum(a.byBucket['Expired'].huom,0)+' · '+fmtInt(a.byBucket['Expired'].chargSet.size)+' batches'},
     {cls:'k-near',label:'NEAR EXPIRY',value:fmtMoney(nearVal),sub:'Qty (PC) '+fmtNum(nearQty,0)+' · Qty (HUOM) '+fmtNum(nearHuom,0)+' · '+fmtInt(nearCharg.size)+' batches'},
     {cls:'k-damaged',label:'Non-Expired Damaged Value',value:fmtMoney(damagedVal),sub:'Qty (PC) '+fmtNum(dmgQty,0)+' · Qty (HUOM) '+fmtNum(dmgHuom,0)+' · '+fmtInt(dmgCharg.size)+' batches'},
-    {cls:'',label:'Goods Disposal · '+currentMonthLabel(),value:fmtMoney(gdVal),sub:'Qty (PC) '+fmtNum(gdQty,0)+' · Qty (HUOM) '+fmtNum(gdHuom,0)+' · '+fmtInt(gdCharg.size)+' batches'},
+    {cls:'',label:'Goods Disposal YTD',value:fmtMoney(gdVal),sub:'Qty (PC) '+fmtNum(gdQty,0)+' · Qty (HUOM) '+fmtNum(gdHuom,0)+' · '+fmtInt(gdCharg.size)+' batches'},
     {cls:'k-active',label:'Slow Moving (no sales 6mo)',value:fmtMoney(a.deadStockVal),sub:'Qty (PC) '+fmtNum(a.deadQty,0)+' · Qty (HUOM) '+fmtNum(a.deadHuom,0)+' · '+fmtInt(a.deadChargSet.size)+' batches'},
   ];
   document.getElementById('kpis').innerHTML=cards.map(c=>`
@@ -1258,21 +1258,10 @@ function drawDead(){
 }
 
 /* ---------- GDRN (goods disposal) table ---------- */
-// Current calendar month key in local time, e.g. '2026-09'.
-function currentMonthStr(){
-  const d=new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-}
-function currentMonthLabel(){
-  return new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
-}
-// GDRN records for the CURRENT MONTH, filtered by the active plant (werks) and
-// sales-org (vkorg) filters.
+// GDRN records filtered by the active plant (werks) and sales-org (vkorg) filters.
 function gdrnFiltered(){
   const all=(window.__AGING__&&window.__AGING__.gdrn&&window.__AGING__.gdrn.records)||[];
-  const mo=currentMonthStr();
   return all.filter(r=>{
-    if(String(r.date||'').slice(0,7)!==mo) return false;
     if(state.werks.size && !state.werks.has(r.werks)) return false;
     if(state.vkorg && r.vkorg!==state.vkorg) return false;
     return true;
@@ -1322,7 +1311,7 @@ function renderGdrnTable(){
       <td class="num">${fmtMoney(r.dmbtr)}</td>
     </tr>`).join('');
   }
-  document.getElementById('gdrn-count').textContent=fmtInt(recs.length)+' lines · '+fmtMoney(recs.reduce((s,r)=>s+(r.dmbtr||0),0))+' disposed · '+currentMonthLabel();
+  document.getElementById('gdrn-count').textContent=fmtInt(recs.length)+' lines · '+fmtMoney(recs.reduce((s,r)=>s+(r.dmbtr||0),0))+' disposed YTD';
 }
 
 /* ---------- wire up ---------- */
