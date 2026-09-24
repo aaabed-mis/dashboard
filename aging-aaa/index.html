@@ -1258,10 +1258,17 @@ function drawDead(){
 }
 
 /* ---------- GDRN (goods disposal) table ---------- */
-// GDRN records filtered by the active plant (werks) and sales-org (vkorg) filters.
+// Current calendar year, e.g. '2026'.
+function currentYearStr(){
+  return String(new Date().getFullYear());
+}
+// GDRN records for the CURRENT YEAR (YTD), filtered by the active plant (werks)
+// and sales-org (vkorg) filters.
 function gdrnFiltered(){
   const all=(window.__AGING__&&window.__AGING__.gdrn&&window.__AGING__.gdrn.records)||[];
+  const yr=currentYearStr();
   return all.filter(r=>{
+    if(String(r.date||'').slice(0,4)!==yr) return false;
     if(state.werks.size && !state.werks.has(r.werks)) return false;
     if(state.vkorg && r.vkorg!==state.vkorg) return false;
     return true;
