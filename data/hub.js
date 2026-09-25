@@ -1,5 +1,5 @@
 window.__HUB__ = {
-  "built_at": "2026-09-24 05:01:43",
+  "built_at": "2026-09-25 05:02:34",
   "dashboards": [
     {
       "order": 1,
@@ -11,7 +11,7 @@ window.__HUB__ = {
       "local": "inventory/index.html",
       "accent": "#4f8cff",
       "icon": "box",
-      "refreshed": "2026-09-24 05:01:01",
+      "refreshed": "2026-09-25 05:01:55",
       "ink": "#0f141c"
     },
     {
@@ -24,7 +24,7 @@ window.__HUB__ = {
       "local": "purchasing/index.html",
       "accent": "#22c1a4",
       "icon": "cart",
-      "refreshed": "2026-09-24 05:01:21",
+      "refreshed": "2026-09-25 05:02:18",
       "ink": "#0f141c"
     },
     {
@@ -37,7 +37,7 @@ window.__HUB__ = {
       "local": "aging/index.html",
       "accent": "#f5a623",
       "icon": "hourglass",
-      "refreshed": "2026-09-24 05:00:23",
+      "refreshed": "2026-09-25 05:01:17",
       "ink": "#0f141c"
     },
     {
@@ -50,7 +50,7 @@ window.__HUB__ = {
       "local": "aging-aaa/index.html",
       "accent": "#a78bfa",
       "icon": "hourglass",
-      "refreshed": "2026-09-24 05:00:23",
+      "refreshed": "2026-09-25 05:01:17",
       "ink": "#0f141c"
     },
     {
@@ -63,7 +63,7 @@ window.__HUB__ = {
       "local": "ap/index.html",
       "accent": "#e5484d",
       "icon": "box",
-      "refreshed": "2026-09-20 15:48:05",
+      "refreshed": "2026-09-24 09:30:08",
       "ink": "#0f141c"
     }
   ]
