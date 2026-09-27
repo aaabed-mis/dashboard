@@ -1,5 +1,5 @@
 window.__HUB__ = {
-  "built_at": "2026-09-27 05:02:03",
+  "built_at": "2026-09-27 09:30:01",
   "dashboards": [
     {
       "order": 1,
@@ -63,7 +63,7 @@ window.__HUB__ = {
       "local": "ap/index.html",
       "accent": "#e5484d",
       "icon": "box",
-      "refreshed": "2026-09-24 09:30:08",
+      "refreshed": "2026-09-27 09:29:50",
       "ink": "#0f141c"
     },
     {
@@ -76,7 +76,7 @@ window.__HUB__ = {
       "local": "sales/index.html",
       "accent": "#33c08a",
       "icon": "box",
-      "refreshed": "2026-09-26 11:42:19",
+      "refreshed": "2026-09-27 09:29:56",
       "ink": "#0f141c"
     }
   ]

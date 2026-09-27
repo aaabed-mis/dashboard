@@ -95,6 +95,19 @@ DASHBOARDS = [
         "icon": "box",
         "stamp_file": "ap/data/ap.json",
     },
+    {
+        "order": 6,
+        "id": "sales",
+        "authId": "sales",
+        "title": "Sales Dashboard",
+        "byline": "Sales value · Target achievement · Returns · Segment, plant, product & customer mix",
+        "desc": "Sales performance and target achievement by region, plant, segment, product "
+                "and customer, with returns, gross profit and CSV export.",
+        "local": "sales/index.html",
+        "accent": "#33c08a",
+        "icon": "box",
+        "stamp_file": "sales/data/sales.json",
+    },
 ]
 
 HEAD_BYTES = 8192

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Dashboard</title>
+  <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
+  <link rel="stylesheet" href="styles.css?v=20260926h" />
+</head>
+<body>
+  <!-- Access gate. No password field: sign-in happens at the hub.
+       Visible from first paint so dashboard content never flashes before the
+       authorisation check completes. -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <img class="auth-logo" src="assets/logo.png" alt="" />
+      <div id="auth-checking">
+        <h1>Checking access</h1>
+        <p class="auth-sub">One moment&#8230;</p>
+      </div>
+      <div id="auth-nosession" class="hidden">
+        <div class="auth-denied-icon">&#128274;</div>
+        <h2>Sign in required</h2>
+        <p>This dashboard is opened from the ERP dashboards hub.</p>
+        <p class="auth-sub">Sign in there and your session is handed over automatically.</p>
+        <a class="auth-btn auth-gohub" href="#">Sign in at the hub</a>
+      </div>
+      <div id="auth-denied" class="auth-denied hidden">
+        <div class="auth-denied-icon">&#9940;</div>
+        <h2>No access to this dashboard</h2>
+        <p>Your account <b id="auth-denied-email"></b> is not assigned to this dashboard.</p>
+        <p class="auth-sub">Ask your administrator, or sign in with a different account.</p>
+        <a class="auth-btn auth-gohub" href="#">Back to the hub</a>
+        <button id="auth-denied-back" class="auth-btn auth-btn-ghost" type="button">Sign out</button>
+      </div>
+      <div id="auth-error" class="auth-error"></div>
+    </div>
+  </div>
+
+  <div id="scale-wrap">
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-mark" src="assets/logo.png" alt="Logo" />
+      <div class="brand-text">
+        <h1>Sales Dashboard</h1>
+        <p id="meta-time">Data refreshed: …</p>
+      </div>
+    </div>
+    <div class="meta">
+      <a id="hub-link" class="pill hub-btn" href="#">Hub</a>
+      <div class="user-menu" id="user-menu">
+        <button id="user-btn" class="user-btn pill" title="Account">👤</button>
+        <div class="user-dropdown hidden">
+          <div class="user-dropdown-head">
+            <span class="user-dropdown-avatar">👤</span>
+            <div>
+              <div class="user-dropdown-name" id="user-name">…</div>
+              <div class="user-dropdown-email" id="user-email">…</div>
+            </div>
+          </div>
+          <button type="button" id="theme-toggle" class="user-dropdown-item theme-item"></button>
+          <button type="button" id="change-password" class="user-dropdown-item">Change password</button>
+          <button type="button" id="logout" class="user-dropdown-item danger">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Change password modal -->
+  <div id="pw-modal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Change password</h2>
+      <form id="pw-form" novalidate>
+        <label class="auth-label" for="pw-current">Current password</label>
+        <input id="pw-current" class="auth-input" type="password" autocomplete="current-password" required />
+        <label class="auth-label" for="pw-new">New password</label>
+        <input id="pw-new" class="auth-input" type="password" autocomplete="new-password" required />
+        <label class="auth-label" for="pw-confirm">Confirm new password</label>
+        <input id="pw-confirm" class="auth-input" type="password" autocomplete="new-password" required />
+        <div id="pw-msg" class="auth-error"></div>
+        <div class="modal-actions">
+          <button type="button" id="pw-cancel" class="auth-btn auth-btn-ghost">Cancel</button>
+          <button type="submit" id="pw-submit" class="auth-btn">Update password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="navtabs" id="nav">
+    <button class="tab active" data-page="exec">Executive Overview</button>
+    <button class="tab" data-page="region">By Region</button>
+    <button class="tab" data-page="plant">By Plant</button>
+    <button class="tab" data-page="segment">By Segment</button>
+    <button class="tab" data-page="product">By Product</button>
+    <button class="tab" data-page="customer">By Customer</button>
+  </nav>
+
+  <!-- Global filters -->
+  <section class="filters">
+    <div class="filter-group"><label>Year</label><select id="f-year" class="select"></select></div>
+    <div class="filter-group"><label>Month</label><select id="f-month" class="select"></select></div>
+    <div class="filter-group"><label>Plant</label><select id="f-plant" class="select"></select></div>
+    <div class="filter-group"><label>Segment</label><select id="f-segment" class="select"></select></div>
+    <button id="reset" class="btn-reset">Reset</button>
+  </section>
+
+  <!-- ============ PAGE 1: EXECUTIVE ============ -->
+  <section id="page-exec" class="page active">
+    <div class="kpis" id="kpis"></div>
+
+    <h2 class="section-title">Sales &amp; Target Trend</h2>
+    <section class="grid">
+      <div class="card span-2">
+        <div class="card-head"><h2>Sales vs Target by Month</h2><span class="hint">actual (SAR M) vs target (SAR M)</span></div>
+        <div class="chart-wrap tall"><canvas id="chart-trend"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Region Sales Performance</h2><span class="hint">sales share by region</span></div>
+        <div class="chart-wrap tall"><canvas id="chart-region"></canvas></div>
+      </div>
+      <div class="grid" style="grid-column:span 3;grid-template-columns:repeat(2,1fr);padding:0">
+        <div class="card">
+          <div class="card-head"><h2>Sales by External Material Group</h2><span class="hint">sales · gp · returns by material group</span></div>
+          <div class="table-scroll" style="max-height:300px"><table id="ext-table"><thead></thead><tbody></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Sales by Segment</h2><span class="hint">sales · gp · returns · target by segment</span></div>
+          <div class="table-scroll tall-scroll"><table id="exec-seg-table"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <h2 class="section-title">Management Attention</h2>
+    <section class="grid">
+      <div class="card span-3">
+        <div class="card-head"><h2>Concentration &amp; Performance Flags</h2><span class="hint">computed from the filtered view</span></div>
+        <div class="attention" id="attention"></div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ PAGE 2: PLANT ============ -->
+  <section id="page-plant" class="page">
+    <div class="kpis" id="kpis-plant"></div>
+    <section class="card table-card">
+      <div class="card-head">
+        <h2>Plant Performance</h2>
+        <div class="head-right">
+          <span id="plant-count" class="hint"></span>
+          <button id="plant-cols-btn" class="btn-export">Columns &#9662;</button>
+          <div id="plant-cols-drop" class="col-drop"></div>
+          <button id="export-plant-csv" class="btn-export">Export CSV</button>
+        </div>
+      </div>
+      <div class="table-scroll tall-scroll">
+        <table id="plant-table"><thead></thead><tbody></tbody></table>
+      </div>
+      <div class="pager">
+        <button id="p-prev" class="btn-page">Prev</button><span id="p-page-info"></span>
+        <button id="p-next" class="btn-page">Next</button>
+        <select id="p-page-size" class="select small"><option>10</option><option selected>20</option><option>50</option><option>100</option></select>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ PAGE 3: SEGMENT ============ -->
+  <section id="page-segment" class="page">
+    <div class="kpis" id="kpis-seg"></div>
+    <section class="card table-card">
+      <div class="card-head">
+        <h2>Segment Summary</h2>
+        <div class="head-right"><span id="seg-count" class="hint"></span>
+          <button id="export-seg-csv" class="btn-export">Export CSV</button></div>
+      </div>
+      <div class="table-scroll tall-scroll">
+        <table id="seg-table"><thead></thead><tbody></tbody></table>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ PAGE 4: REGION ============ -->
+  <section id="page-region" class="page">
+    <div class="region-grid" id="region-grid"></div>
+  </section>
+
+  <!-- ============ PAGE 5: PRODUCT ============ -->
+  <section id="page-product" class="page">
+    <div class="kpis" id="kpis-product"></div>
+    <section class="card table-card">
+      <div class="card-head">
+        <h2>Product Performance <span class="hint">(top 1,500 materials by sales value · year/month filters apply)</span></h2>
+        <div class="head-right"><span id="product-count" class="hint"></span>
+          <button id="export-product-csv" class="btn-export">Export CSV</button></div>
+      </div>
+      <div class="table-scroll tall-scroll">
+        <table id="product-table"><thead></thead><tbody></tbody></table>
+      </div>
+      <div class="pager">
+        <button id="pr-prev" class="btn-page">Prev</button><span id="pr-page-info"></span>
+        <button id="pr-next" class="btn-page">Next</button>
+        <select id="pr-page-size" class="select small"><option>10</option><option selected>20</option><option>50</option><option>100</option></select>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ PAGE 6: CUSTOMER ============ -->
+  <section id="page-customer" class="page">
+    <div class="kpis" id="kpis-customer"></div>
+    <section class="grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="card">
+        <div class="card-head"><h2>Cash vs Credit Sales</h2><span class="hint">sales by payment class · follows the selected Year/Month filter</span></div>
+        <div class="chart-wrap tall"><canvas id="customer-class-chart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Cash vs Credit — Active Customers</h2><span class="hint">active customers by payment class · last 6 months</span></div>
+        <div class="chart-wrap tall"><canvas id="customer-class-trend"></canvas></div>
+      </div>
+    </section>
+    <section class="card table-card">
+      <div class="card-head">
+        <h2>Customer Performance <span class="hint">(top 1,500 by sales value)</span></h2>
+        <div class="head-right"><span id="customer-count" class="hint"></span>
+          <button id="export-customer-csv" class="btn-export">Export CSV</button></div>
+      </div>
+      <div class="table-scroll tall-scroll">
+        <table id="customer-table"><thead></thead><tbody></tbody></table>
+      </div>
+      <div class="pager">
+        <button id="c-prev" class="btn-page">Prev</button><span id="c-page-info"></span>
+        <button id="c-next" class="btn-page">Next</button>
+        <select id="c-page-size" class="select small"><option>10</option><option selected>20</option><option>50</option><option>100</option></select>
+      </div>
+    </section>
+  </section>
+
+  </div>
+
+  <div class="loading" id="loading"><div><div class="spin"></div>Loading sales data…</div></div>
+
+  <script src="assets/supabase-js.min.js?v=20260912c"></script>
+  <script src="auth-config.js?v=20260913b"></script>
+  <script src="auth.js?v=20260912m"></script>
+  <script src="assets/chart.umd.min.js"></script>
+  <script src="data/data.js?v=20260927b"></script>
+  <script src="app.js?v=20260926i"></script>
+</body>
+</html>
